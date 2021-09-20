@@ -603,6 +603,25 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 			OutputStatus();
 			return;
 		}
+		else if (!_strnicmp(szCurArg, "on", 3))
+		{
+			AS_Config.OptByZone = true;
+			if (AS_Config.OptByRange)
+			{
+				AS_Config.OptByRange = false;
+				WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
+			}
+			ResizeAll();
+			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByZone ? "\agenabled" : "\ardisabled");
+			if (AS_Config.OptAutoSave) SaveINI();
+		}
+		else if (!_strnicmp(szCurArg, "off", 4))
+		{
+			AS_Config.OptByZone = false;
+			ResetAll();
+			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByZone ? "\agenabled" : "\ardisabled");
+			if (AS_Config.OptAutoSave) SaveINI();
+		}
 		else
 		{
 			WriteChatf("\ay%s\aw:: \arInvalid command parameter.", MODULE_NAME);
