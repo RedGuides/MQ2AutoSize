@@ -66,7 +66,7 @@ const float OTHER_SIZE = 1.0f;
 const float ZERO_SIZE = 0.0f;
 unsigned int uiSkipPulse = 0;
 char szTemp[MAX_STRING] = { 0 };
-void ResizeAll();
+void SpawnListResize(bool bReset);
 
 // our configuration
 class COurSizes
@@ -181,7 +181,7 @@ void LoadINI()
 	AS_Config.SizeSelf = SaneSize((float)GetPrivateProfileInt("Config", "SizeSelf", (int)MIN_SIZE, INIFileName));
 
 	// apply new INI read
-	if (GetGameState() == GAMESTATE_INGAME && pLocalPlayer && AS_Config.OptByZone) ResizeAll();
+	if (GetGameState() == GAMESTATE_INGAME && pLocalPlayer && AS_Config.OptByZone) SpawnListResize(false);
 }
 template <unsigned int _Size>LPSTR SafeItoa(int _Value,char(&_Buffer)[_Size], int _Radix)
 {
@@ -317,16 +317,6 @@ void SpawnListResize(bool bReset)
 	}
 }
 
-void ResizeAll()
-{
-	SpawnListResize(false);
-}
-
-void ResetAll()
-{
-	SpawnListResize(true);
-}
-
 PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn)
 {
 	if (AS_Config.OptByZone) SizePasser(pNewSpawn, false);
@@ -334,7 +324,7 @@ PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn)
 
 PLUGIN_API void OnEndZone()
 {
-	ResizeAll();
+	SpawnListResize(false);
 }
 
 PLUGIN_API void OnPulse()
@@ -425,6 +415,14 @@ void SetSizeConfig(const char* pszOption, float fNewSize, float* fChangeThis)
 	if (AS_Config.OptAutoSave) SaveINI();
 }
 
+void SetEnabled(bool bEnable) {
+	AS_Config.OptByZone = bEnable;
+	SpawnListResize(!bEnable);
+	WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByZone ? "\agenabled" : "\ardisabled");
+	if (AS_Config.OptAutoSave)
+		SaveINI();
+}
+
 void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 {
 	char szCurArg[MAX_STRING] = { 0 };
@@ -435,22 +433,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 
 	if (!*szCurArg)
 	{
-		AS_Config.OptByZone = !AS_Config.OptByZone;
-		if (AS_Config.OptByZone)
-		{
-			if (AS_Config.OptByRange)
-			{
-				AS_Config.OptByRange = false;
-				WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
-			}
-			ResizeAll();
-		}
-		else
-		{
-			ResetAll();
-		}
-		WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByZone ? "\agenabled" : "\ardisabled");
-		if (AS_Config.OptAutoSave) SaveINI();
+		SetEnabled(!AS_Config.OptByZone);
 	}
 	else
 	{
@@ -468,7 +451,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 			}
 			else
 			{
-				ResetAll();
+				SpawnListResize(true);
 			}
 			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByRange ? "\agenabled" : "\ardisabled");
 			if (AS_Config.OptAutoSave) SaveINI();
@@ -551,7 +534,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		}
 		else if (!_strnicmp(szCurArg, "everything", 11))
 		{
-			if (!ToggleOption("Everything", &AS_Config.OptEverything)) ResetAll();
+			if (!ToggleOption("Everything", &AS_Config.OptEverything)) SpawnListResize(true);
 		}
 		else if (!_strnicmp(szCurArg, "pets", 5))
 		{
@@ -605,22 +588,11 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		}
 		else if (!_strnicmp(szCurArg, "on", 3))
 		{
-			AS_Config.OptByZone = true;
-			if (AS_Config.OptByRange)
-			{
-				AS_Config.OptByRange = false;
-				WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
-			}
-			ResizeAll();
-			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByZone ? "\agenabled" : "\ardisabled");
-			if (AS_Config.OptAutoSave) SaveINI();
+			SetEnabled(true);
 		}
 		else if (!_strnicmp(szCurArg, "off", 4))
 		{
-			AS_Config.OptByZone = false;
-			ResetAll();
-			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByZone ? "\agenabled" : "\ardisabled");
-			if (AS_Config.OptAutoSave) SaveINI();
+			SetEnabled(false);
 		}
 		else
 		{
@@ -629,7 +601,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		}
 
 		// if size change or everything, pets, mercs,mounts toggled and won't be handled onpulse
-		if (AS_Config.OptByZone) ResizeAll();
+		if (AS_Config.OptByZone) SpawnListResize(false);
 	}
 }
 
@@ -641,7 +613,6 @@ PLUGIN_API void InitializePlugin()
 	{
 		AddCommand("/autosize", AutoSizeCmd);
 		LoadINI();
-		//ResizeAll();
 	}
 	else
 	{
@@ -655,7 +626,7 @@ PLUGIN_API void ShutdownPlugin()
 	if (addrChangeHeight)
 	{
 		RemoveCommand("/autosize");
-		ResetAll();
+		SpawnListResize(true);
 		SaveINI();
 	}
 }
