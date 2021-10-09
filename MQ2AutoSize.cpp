@@ -431,6 +431,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 	GetArg(szNumber, szLine, 2);
 	float fNewSize = (float)atof(szNumber);
 
+	// TODO:  Previous implementation of toggle by range was broken.  Need to add handling for toggle when range is set
 	if (!*szCurArg)
 	{
 		SetEnabled(!AS_Config.OptByZone);
