@@ -369,7 +369,7 @@ void OutputHelp()
 	WriteChatf("--- Valid Size Syntax (1 to 250) ---");
 	WriteChatf("  \ag/autosize\ax [ \aysize\ax | \aysizepc\ax | \aysizenpc\ax | \aysizepets\ax | \aysizemercs\ax | \aysizemounts\ax | \aysizecorpse\ax | \aysizetarget\ax | \aysizeself\ax ] [ \ay#\ax ]");
 	WriteChatf("--- Other Valid Commands ---");
-	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
+	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax | \ayui\ax ]");
 }
 
 void OutputStatus()
@@ -576,8 +576,8 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		{
 			if (!ToggleOption("Self", &AS_Config.OptSelf))
 			{
-				if (((PSPAWNINFO)pLocalPlayer)->Mount) ChangeSize((PSPAWNINFO)pLocalPlayer, ZERO_SIZE);
-				else ChangeSize((PSPAWNINFO)pCharSpawn, ZERO_SIZE);
+				if ((pLocalPlayer)->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
+				else ChangeSize(pCharSpawn, ZERO_SIZE);
 			}
 		}
 		else if (!_strnicmp(szCurArg, "help", 5))
@@ -597,6 +597,10 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		else if (!_strnicmp(szCurArg, "off", 4))
 		{
 			SetEnabled(false);
+		}
+		else if (!_strnicmp(szCurArg, "ui", 3))
+		{
+			EzCommand("/mqsettings plugins/autosize");
 		}
 		else
 		{
@@ -696,8 +700,8 @@ void MQ2AutoSizeImGuiSettingsPanel()
 			{
 				if (!ToggleOption(cb.name, cb.value))
 				{
-					if (((PSPAWNINFO)pLocalPlayer)->Mount) ChangeSize((PSPAWNINFO)pLocalPlayer, ZERO_SIZE);
-					else ChangeSize((PSPAWNINFO)pCharSpawn, ZERO_SIZE);
+					if ((pLocalPlayer)->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
+					else ChangeSize(pCharSpawn, ZERO_SIZE);
 				}
 			}
 			else if (!_strnicmp(cb.name, "Everything", 11))
