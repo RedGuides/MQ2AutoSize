@@ -613,22 +613,35 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 	}
 }
 
+enum eAutoSizeTypes
+{
+	AS_PC = 0,
+	AS_NPC,
+	AS_PETS,
+	AS_MERCS,
+	AS_MOUNTS,
+	AS_CORPSES,
+	AS_EVERYTHING,
+	AS_SELF,
+};
+
 struct SpawnTypeCheckbox {
+	eAutoSizeTypes asType;
 	const char* name;
 	bool* value;
 	float* size;
-	eSpawnType type;
+	eSpawnType spawnType;
 };
 
 static const SpawnTypeCheckbox checkboxes[] = {
-	{ "PC", &AS_Config.OptPC, &AS_Config.SizePC, PC },
-	{ "NPC", &AS_Config.OptNPC, &AS_Config.SizeNPC, NPC },
-	{ "Pets", &AS_Config.OptPet, &AS_Config.SizePet, PET },
-	{ "Mercs", &AS_Config.OptMerc, &AS_Config.SizeMerc, MERCENARY },
-	{ "Mounts", &AS_Config.OptMount, &AS_Config.SizeMount, MOUNT },
-	{ "Corpses", &AS_Config.OptCorpse, &AS_Config.SizeCorpse, CORPSE },
-	{ "Everything", &AS_Config.OptEverything, &AS_Config.SizeDefault, NONE },
-	{ "Self", &AS_Config.OptSelf, &AS_Config.SizeSelf, NONE },
+	{ AS_PC, "PC", &AS_Config.OptPC, &AS_Config.SizePC, PC },
+	{ AS_NPC, "NPC", &AS_Config.OptNPC, &AS_Config.SizeNPC, NPC },
+	{ AS_PETS, "Pets", &AS_Config.OptPet, &AS_Config.SizePet, PET },
+	{ AS_MERCS, "Mercs", &AS_Config.OptMerc, &AS_Config.SizeMerc, MERCENARY },
+	{ AS_MOUNTS, "Mounts", &AS_Config.OptMount, &AS_Config.SizeMount, MOUNT },
+	{ AS_CORPSES, "Corpses", &AS_Config.OptCorpse, &AS_Config.SizeCorpse, CORPSE },
+	{ AS_EVERYTHING, "Everything", &AS_Config.OptEverything, &AS_Config.SizeDefault, NONE },
+	{ AS_SELF, "Self", &AS_Config.OptSelf, &AS_Config.SizeSelf, NONE },
 };
 
 void MQ2AutoSizeImGuiSettingsPanel()
@@ -679,7 +692,7 @@ void MQ2AutoSizeImGuiSettingsPanel()
 	}
 	{
 		ImGui::BeginDisabled(!AS_Config.OptByRange);
-		ImGui::SetNextItemWidth(300);
+		ImGui::SetNextItemWidth(150);
 		if (ImGui::SliderInt("Resize Range", &AS_Config.ResizeRange, 0, 250))
 		{
 			WriteChatf("\ay%s\aw:: Range set to \ag%d", MODULE_NAME, AS_Config.ResizeRange);
@@ -689,49 +702,44 @@ void MQ2AutoSizeImGuiSettingsPanel()
 	}
 	ImGui::Separator();
 	ImGui::Text("Configure per spawn type AutoSize settings");
-	ImGui::Columns(2);
-	ImGui::SetColumnWidth(0, 125);
 	for (const SpawnTypeCheckbox& cb : checkboxes)
 	{
 		bool tempValue = *cb.value;
-		if (ImGui::Checkbox(cb.name, &tempValue))
+		char buf[32];
+		sprintf_s(buf, "##%s", cb.name);
+		if (ImGui::Checkbox(buf, &tempValue))
 		{
-			if (!_strnicmp(cb.name, "Self", 5))
+			switch (cb.asType)
 			{
+			case AS_SELF:
 				if (!ToggleOption(cb.name, cb.value))
 				{
 					if ((pLocalPlayer)->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
 					else ChangeSize(pCharSpawn, ZERO_SIZE);
 				}
-			}
-			else if (!_strnicmp(cb.name, "Everything", 11))
-			{
+				break;
+			case AS_EVERYTHING:
 				if (!ToggleOption(cb.name, cb.value)) SpawnListResize(true);
-			}
-			else
-			{
-				if (!ToggleOption(cb.name, cb.value)) ResetAllByType(cb.type);
+				break;
+			default:
+				if (!ToggleOption(cb.name, cb.value)) ResetAllByType(cb.spawnType);
 			}
 		}
-		ImGui::NextColumn();
+		ImGui::SameLine();
 		float tempSize = *cb.size;
-		char buf[32];
-		sprintf_s(buf, "##%s", cb.name);
-		ImGui::SetNextItemWidth(300);
-		if (ImGui::SliderFloat(buf, &tempSize, MIN_SIZE, MAX_SIZE))
+		ImGui::SetNextItemWidth(150);
+		if (ImGui::SliderFloat(cb.name, &tempSize, MIN_SIZE, MAX_SIZE))
 		{
-			if (!_strnicmp(cb.name, "PC", 3)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizePC);
-			else if (!_strnicmp(cb.name, "NPC", 4)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeNPC);
-			else if (!_strnicmp(cb.name, "Pets", 5)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizePet);
-			else if (!_strnicmp(cb.name, "Mercs", 6)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeMerc);
-			else if (!_strnicmp(cb.name, "Mounts", 7)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeMount);
-			else if (!_strnicmp(cb.name, "Corpses", 8)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeCorpse);
-			else if (!_strnicmp(cb.name, "Everything", 11)) SetSizeConfig("Default", tempSize, &AS_Config.SizeDefault);
-			else if (!_strnicmp(cb.name, "Self", 5)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeSelf);
+			switch (cb.asType)
+			{
+			case AS_EVERYTHING:
+				SetSizeConfig("Default", tempSize, cb.size);
+				break;
+			default:
+				SetSizeConfig(cb.name, tempSize, cb.size);
+			}
 		}
-		ImGui::NextColumn();
 	}
-	ImGui::Columns(1);
 	if (AS_Config.OptByZone) SpawnListResize(false);
 }
 
