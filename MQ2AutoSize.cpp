@@ -51,6 +51,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include <mq/Plugin.h>
+#include <mq/imgui/ImGuiUtils.h>
 
 const char* MODULE_NAME = "MQ2AutoSize";
 PreSetup(MODULE_NAME);
@@ -608,12 +609,135 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 	}
 }
 
+struct SpawnTypeCheckbox {
+	const char* name;
+	bool* value;
+	float* size;
+	eSpawnType type;
+};
+
+static const SpawnTypeCheckbox checkboxes[] = {
+	{ "PC", &AS_Config.OptPC, &AS_Config.SizePC, PC },
+	{ "NPC", &AS_Config.OptNPC, &AS_Config.SizeNPC, NPC },
+	{ "Pets", &AS_Config.OptPet, &AS_Config.SizePet, PET },
+	{ "Mercs", &AS_Config.OptMerc, &AS_Config.SizeMerc, MERCENARY },
+	{ "Mounts", &AS_Config.OptMount, &AS_Config.SizeMount, MOUNT },
+	{ "Corpses", &AS_Config.OptCorpse, &AS_Config.SizeCorpse, CORPSE },
+	{ "Everything", &AS_Config.OptEverything, &AS_Config.SizeDefault, NONE },
+	{ "Self", &AS_Config.OptSelf, &AS_Config.SizeSelf, NONE },
+};
+
+void MQ2AutoSizeImGuiSettingsPanel()
+{
+	if (ImGui::Checkbox("Auto Save Settings", &AS_Config.OptAutoSave))
+	{
+		WriteChatf("\ay%s\aw:: Option (\ay%s\ax) now %s\ax", MODULE_NAME, "autosave", AS_Config.OptAutoSave ? "\agenabled" : "\ardisabled");
+		if (AS_Config.OptAutoSave) SaveINI();
+	}
+	if (ImGui::Button("Load"))
+	{
+		LoadINI();
+		WriteChatf("\ay%s\aw:: Configuration file loaded.", MODULE_NAME);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Save"))
+	{
+		SaveINI();
+		WriteChatf("\ay%s\aw:: Configuration file saved.", MODULE_NAME);
+	}
+	ImGui::Separator();
+	if (ImGui::Checkbox("Enabled Zone Wide", &AS_Config.OptByZone))
+	{
+		SetEnabled(AS_Config.OptByZone);
+		if (AS_Config.OptByZone)
+		{
+			if (AS_Config.OptByRange) {
+				AS_Config.OptByRange = false;
+				WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
+			}
+		}
+	}
+	if (ImGui::Checkbox("Enabled in Range", &AS_Config.OptByRange))
+	{
+		SetEnabled(AS_Config.OptByRange);
+		if (AS_Config.OptByRange)
+		{
+			if (AS_Config.OptByZone)
+			{
+				AS_Config.OptByZone = false;
+				WriteChatf("\ay%s\aw:: AutoSize (\ayAllZone\ax) now \ardisabled\ax!", MODULE_NAME);
+			}
+		}
+		else
+		{
+			SpawnListResize(true);
+		}
+	}
+	{
+		ImGui::BeginDisabled(!AS_Config.OptByRange);
+		ImGui::SetNextItemWidth(300);
+		if (ImGui::SliderInt("Resize Range", &AS_Config.ResizeRange, 0, 250))
+		{
+			WriteChatf("\ay%s\aw:: Range set to \ag%d", MODULE_NAME, AS_Config.ResizeRange);
+			if (AS_Config.OptAutoSave) SaveINI();
+		}
+		ImGui::EndDisabled();
+	}
+	ImGui::Separator();
+	ImGui::Text("Configure per spawn type AutoSize settings");
+	ImGui::Columns(2);
+	ImGui::SetColumnWidth(0, 125);
+	for (const SpawnTypeCheckbox& cb : checkboxes)
+	{
+		bool tempValue = *cb.value;
+		if (ImGui::Checkbox(cb.name, &tempValue))
+		{
+			if (!_strnicmp(cb.name, "Self", 5))
+			{
+				if (!ToggleOption(cb.name, cb.value))
+				{
+					if (((PSPAWNINFO)pLocalPlayer)->Mount) ChangeSize((PSPAWNINFO)pLocalPlayer, ZERO_SIZE);
+					else ChangeSize((PSPAWNINFO)pCharSpawn, ZERO_SIZE);
+				}
+			}
+			else if (!_strnicmp(cb.name, "Everything", 11))
+			{
+				if (!ToggleOption(cb.name, cb.value)) SpawnListResize(true);
+			}
+			else
+			{
+				if (!ToggleOption(cb.name, cb.value)) ResetAllByType(cb.type);
+			}
+		}
+		ImGui::NextColumn();
+		float tempSize = *cb.size;
+		char buf[32];
+		sprintf_s(buf, "##%s", cb.name);
+		ImGui::SetNextItemWidth(300);
+		if (ImGui::SliderFloat(buf, &tempSize, MIN_SIZE, MAX_SIZE))
+		{
+			if (!_strnicmp(cb.name, "PC", 3)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizePC);
+			else if (!_strnicmp(cb.name, "NPC", 4)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeNPC);
+			else if (!_strnicmp(cb.name, "Pets", 5)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizePet);
+			else if (!_strnicmp(cb.name, "Mercs", 6)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeMerc);
+			else if (!_strnicmp(cb.name, "Mounts", 7)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeMount);
+			else if (!_strnicmp(cb.name, "Corpses", 8)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeCorpse);
+			else if (!_strnicmp(cb.name, "Everything", 11)) SetSizeConfig("Default", tempSize, &AS_Config.SizeDefault);
+			else if (!_strnicmp(cb.name, "Self", 5)) SetSizeConfig(cb.name, tempSize, &AS_Config.SizeSelf);
+		}
+		ImGui::NextColumn();
+	}
+	ImGui::Columns(1);
+	if (AS_Config.OptByZone) SpawnListResize(false);
+}
+
 PLUGIN_API void InitializePlugin()
 {
 	EzDetour(PlayerZoneClient__ChangeHeight, &PlayerZoneClient_Hook::ChangeHeight_Detour, &PlayerZoneClient_Hook::ChangeHeight_Trampoline);
 
 	AddCommand("/autosize", AutoSizeCmd);
 	LoadINI();
+	AddSettingsPanel("plugins/AutoSize", MQ2AutoSizeImGuiSettingsPanel);
 }
 
 PLUGIN_API void ShutdownPlugin()
@@ -623,5 +747,5 @@ PLUGIN_API void ShutdownPlugin()
 	RemoveCommand("/autosize");
 	SpawnListResize(true);
 	SaveINI();
-
+	RemoveSettingsPanel("plugins/AutoSize");
 }
