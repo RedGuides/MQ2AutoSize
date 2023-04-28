@@ -51,6 +51,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include <mq/Plugin.h>
+#include <mq/imgui/ImGuiUtils.h>
 
 const char* MODULE_NAME = "MQ2AutoSize";
 PreSetup(MODULE_NAME);
@@ -226,8 +227,8 @@ void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize)
 void SizePasser(PSPAWNINFO pSpawn, bool bReset)
 {
 	if ((!bReset && !AS_Config.OptByZone && !AS_Config.OptByRange) || GetGameState() != GAMESTATE_INGAME) return;
-	PSPAWNINFO pChSpawn = (PSPAWNINFO)pCharSpawn;
-	PSPAWNINFO pLPlayer = (PSPAWNINFO)pLocalPlayer;
+	PSPAWNINFO pChSpawn = pCharSpawn;
+	PSPAWNINFO pLPlayer = pLocalPlayer;
 	if (!pLPlayer || !pChSpawn->SpawnID || !pSpawn || !pSpawn->SpawnID) return;
 
 	if (pSpawn->SpawnID == pLPlayer->SpawnID)
@@ -289,9 +290,9 @@ void SizePasser(PSPAWNINFO pSpawn, bool bReset)
 
 void ResetAllByType(eSpawnType OurType)
 {
-	PSPAWNINFO pSpawn = (PSPAWNINFO)pSpawnList;
-	PSPAWNINFO pChSpawn = (PSPAWNINFO)pCharSpawn;
-	PSPAWNINFO pLPlayer = (PSPAWNINFO)pLocalPlayer;
+	PSPAWNINFO pSpawn = pSpawnList;
+	PSPAWNINFO pChSpawn = pCharSpawn;
+	PSPAWNINFO pLPlayer = pLocalPlayer;
 	if (GetGameState() != GAMESTATE_INGAME || !pLPlayer || !pChSpawn->SpawnID || !pSpawn || !pSpawn->SpawnID) return;
 
 	while (pSpawn)
@@ -311,7 +312,7 @@ void ResetAllByType(eSpawnType OurType)
 void SpawnListResize(bool bReset)
 {
 	if (GetGameState() != GAMESTATE_INGAME) return;
-	PSPAWNINFO pSpawn = (PSPAWNINFO)pSpawnList;
+	PSPAWNINFO pSpawn = pSpawnList;
 	while (pSpawn)
 	{
 		SizePasser(pSpawn, bReset);
@@ -338,13 +339,13 @@ PLUGIN_API void OnPulse()
 		return;
 	}
 
-	PSPAWNINFO pAllSpawns = (PSPAWNINFO)pSpawnList;
+	PSPAWNINFO pAllSpawns = pSpawnList;
 	float fDist = 0.0f;
 	uiSkipPulse = 0;
 
 	while (pAllSpawns)
 	{
-		fDist = GetDistance((PSPAWNINFO)pLocalPlayer, pAllSpawns);
+		fDist = GetDistance(pLocalPlayer, pAllSpawns);
 		if (fDist < AS_Config.ResizeRange)
 		{
 			SizePasser(pAllSpawns, false);
@@ -368,7 +369,7 @@ void OutputHelp()
 	WriteChatf("--- Valid Size Syntax (1 to 250) ---");
 	WriteChatf("  \ag/autosize\ax [ \aysize\ax | \aysizepc\ax | \aysizenpc\ax | \aysizepets\ax | \aysizemercs\ax | \aysizemounts\ax | \aysizecorpse\ax | \aysizetarget\ax | \aysizeself\ax ] [ \ay#\ax ]");
 	WriteChatf("--- Other Valid Commands ---");
-	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
+	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax | \ayui\ax ]");
 }
 
 void OutputStatus()
@@ -557,7 +558,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		}
 		else if (!_strnicmp(szCurArg, "target", 7))
 		{
-			PSPAWNINFO pTheTarget = (PSPAWNINFO)pTarget;
+			PSPAWNINFO pTheTarget = pTarget;
 			if (pTheTarget && GetGameState() == GAMESTATE_INGAME && pTheTarget->SpawnID)
 			{
 				ChangeSize(pTheTarget, AS_Config.SizeTarget);
@@ -575,8 +576,8 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		{
 			if (!ToggleOption("Self", &AS_Config.OptSelf))
 			{
-				if (((PSPAWNINFO)pLocalPlayer)->Mount) ChangeSize((PSPAWNINFO)pLocalPlayer, ZERO_SIZE);
-				else ChangeSize((PSPAWNINFO)pCharSpawn, ZERO_SIZE);
+				if (pLocalPlayer->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
+				else ChangeSize(pCharSpawn, ZERO_SIZE);
 			}
 		}
 		else if (!_strnicmp(szCurArg, "help", 5))
@@ -597,6 +598,10 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		{
 			SetEnabled(false);
 		}
+		else if (!_strnicmp(szCurArg, "ui", 3))
+		{
+			EzCommand("/mqsettings plugins/autosize");
+		}
 		else
 		{
 			WriteChatf("\ay%s\aw:: \arInvalid command parameter.", MODULE_NAME);
@@ -608,12 +613,143 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 	}
 }
 
+enum eAutoSizeTypes
+{
+	AS_PC = 0,
+	AS_NPC,
+	AS_PETS,
+	AS_MERCS,
+	AS_MOUNTS,
+	AS_CORPSES,
+	AS_EVERYTHING,
+	AS_SELF,
+};
+
+struct SpawnTypeCheckbox {
+	eAutoSizeTypes asType;
+	const char* name;
+	bool* value;
+	float* size;
+	eSpawnType spawnType;
+};
+
+static const SpawnTypeCheckbox checkboxes[] = {
+	{ AS_PC, "PC", &AS_Config.OptPC, &AS_Config.SizePC, PC },
+	{ AS_NPC, "NPC", &AS_Config.OptNPC, &AS_Config.SizeNPC, NPC },
+	{ AS_PETS, "Pets", &AS_Config.OptPet, &AS_Config.SizePet, PET },
+	{ AS_MERCS, "Mercs", &AS_Config.OptMerc, &AS_Config.SizeMerc, MERCENARY },
+	{ AS_MOUNTS, "Mounts", &AS_Config.OptMount, &AS_Config.SizeMount, MOUNT },
+	{ AS_CORPSES, "Corpses", &AS_Config.OptCorpse, &AS_Config.SizeCorpse, CORPSE },
+	{ AS_EVERYTHING, "Everything", &AS_Config.OptEverything, &AS_Config.SizeDefault, NONE },
+	{ AS_SELF, "Self", &AS_Config.OptSelf, &AS_Config.SizeSelf, NONE },
+};
+
+void MQ2AutoSizeImGuiSettingsPanel()
+{
+	if (ImGui::Checkbox("Auto Save Settings", &AS_Config.OptAutoSave))
+	{
+		WriteChatf("\ay%s\aw:: Option (\ay%s\ax) now %s\ax", MODULE_NAME, "autosave", AS_Config.OptAutoSave ? "\agenabled" : "\ardisabled");
+		if (AS_Config.OptAutoSave) SaveINI();
+	}
+	if (ImGui::Button("Load"))
+	{
+		LoadINI();
+		WriteChatf("\ay%s\aw:: Configuration file loaded.", MODULE_NAME);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Save"))
+	{
+		SaveINI();
+		WriteChatf("\ay%s\aw:: Configuration file saved.", MODULE_NAME);
+	}
+	ImGui::Separator();
+	if (ImGui::Checkbox("Enabled Zone Wide", &AS_Config.OptByZone))
+	{
+		SetEnabled(AS_Config.OptByZone);
+		if (AS_Config.OptByZone)
+		{
+			if (AS_Config.OptByRange) {
+				AS_Config.OptByRange = false;
+				WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
+			}
+		}
+	}
+	if (ImGui::Checkbox("Enabled in Range", &AS_Config.OptByRange))
+	{
+		SetEnabled(AS_Config.OptByRange);
+		if (AS_Config.OptByRange)
+		{
+			if (AS_Config.OptByZone)
+			{
+				AS_Config.OptByZone = false;
+				WriteChatf("\ay%s\aw:: AutoSize (\ayAllZone\ax) now \ardisabled\ax!", MODULE_NAME);
+			}
+		}
+		else
+		{
+			SpawnListResize(true);
+		}
+	}
+	{
+		ImGui::BeginDisabled(!AS_Config.OptByRange);
+		ImGui::SetNextItemWidth(150);
+		if (ImGui::SliderInt("Resize Range", &AS_Config.ResizeRange, 0, 250))
+		{
+			WriteChatf("\ay%s\aw:: Range set to \ag%d", MODULE_NAME, AS_Config.ResizeRange);
+			if (AS_Config.OptAutoSave) SaveINI();
+		}
+		ImGui::EndDisabled();
+	}
+	ImGui::Separator();
+	ImGui::Text("Configure per spawn type AutoSize settings");
+	for (const SpawnTypeCheckbox& cb : checkboxes)
+	{
+		ImGui::PushID(cb.value);
+		bool tempValue = *cb.value;
+		if (ImGui::Checkbox("##checkbox", &tempValue))
+		{
+			switch (cb.asType)
+			{
+			case AS_SELF:
+				if (!ToggleOption(cb.name, cb.value))
+				{
+					if (pLocalPlayer->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
+					else ChangeSize(pCharSpawn, ZERO_SIZE);
+				}
+				break;
+			case AS_EVERYTHING:
+				if (!ToggleOption(cb.name, cb.value)) SpawnListResize(true);
+				break;
+			default:
+				if (!ToggleOption(cb.name, cb.value)) ResetAllByType(cb.spawnType);
+			}
+		}
+		ImGui::SameLine();
+		float tempSize = *cb.size;
+		ImGui::SetNextItemWidth(150);
+		if (ImGui::SliderFloat(cb.name, &tempSize, MIN_SIZE, MAX_SIZE))
+		{
+			switch (cb.asType)
+			{
+			case AS_EVERYTHING:
+				SetSizeConfig("Default", tempSize, cb.size);
+				break;
+			default:
+				SetSizeConfig(cb.name, tempSize, cb.size);
+			}
+		}
+		ImGui::PopID();
+	}
+	if (AS_Config.OptByZone) SpawnListResize(false);
+}
+
 PLUGIN_API void InitializePlugin()
 {
 	EzDetour(PlayerZoneClient__ChangeHeight, &PlayerZoneClient_Hook::ChangeHeight_Detour, &PlayerZoneClient_Hook::ChangeHeight_Trampoline);
 
 	AddCommand("/autosize", AutoSizeCmd);
 	LoadINI();
+	AddSettingsPanel("plugins/AutoSize", MQ2AutoSizeImGuiSettingsPanel);
 }
 
 PLUGIN_API void ShutdownPlugin()
@@ -623,5 +759,5 @@ PLUGIN_API void ShutdownPlugin()
 	RemoveCommand("/autosize");
 	SpawnListResize(true);
 	SaveINI();
-
+	RemoveSettingsPanel("plugins/AutoSize");
 }
