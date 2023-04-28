@@ -227,8 +227,8 @@ void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize)
 void SizePasser(PSPAWNINFO pSpawn, bool bReset)
 {
 	if ((!bReset && !AS_Config.OptByZone && !AS_Config.OptByRange) || GetGameState() != GAMESTATE_INGAME) return;
-	PSPAWNINFO pChSpawn = (PSPAWNINFO)pCharSpawn;
-	PSPAWNINFO pLPlayer = (PSPAWNINFO)pLocalPlayer;
+	PSPAWNINFO pChSpawn = pCharSpawn;
+	PSPAWNINFO pLPlayer = pLocalPlayer;
 	if (!pLPlayer || !pChSpawn->SpawnID || !pSpawn || !pSpawn->SpawnID) return;
 
 	if (pSpawn->SpawnID == pLPlayer->SpawnID)
@@ -290,9 +290,9 @@ void SizePasser(PSPAWNINFO pSpawn, bool bReset)
 
 void ResetAllByType(eSpawnType OurType)
 {
-	PSPAWNINFO pSpawn = (PSPAWNINFO)pSpawnList;
-	PSPAWNINFO pChSpawn = (PSPAWNINFO)pCharSpawn;
-	PSPAWNINFO pLPlayer = (PSPAWNINFO)pLocalPlayer;
+	PSPAWNINFO pSpawn = pSpawnList;
+	PSPAWNINFO pChSpawn = pCharSpawn;
+	PSPAWNINFO pLPlayer = pLocalPlayer;
 	if (GetGameState() != GAMESTATE_INGAME || !pLPlayer || !pChSpawn->SpawnID || !pSpawn || !pSpawn->SpawnID) return;
 
 	while (pSpawn)
@@ -312,7 +312,7 @@ void ResetAllByType(eSpawnType OurType)
 void SpawnListResize(bool bReset)
 {
 	if (GetGameState() != GAMESTATE_INGAME) return;
-	PSPAWNINFO pSpawn = (PSPAWNINFO)pSpawnList;
+	PSPAWNINFO pSpawn = pSpawnList;
 	while (pSpawn)
 	{
 		SizePasser(pSpawn, bReset);
@@ -339,13 +339,13 @@ PLUGIN_API void OnPulse()
 		return;
 	}
 
-	PSPAWNINFO pAllSpawns = (PSPAWNINFO)pSpawnList;
+	PSPAWNINFO pAllSpawns = pSpawnList;
 	float fDist = 0.0f;
 	uiSkipPulse = 0;
 
 	while (pAllSpawns)
 	{
-		fDist = GetDistance((PSPAWNINFO)pLocalPlayer, pAllSpawns);
+		fDist = GetDistance(pLocalPlayer, pAllSpawns);
 		if (fDist < AS_Config.ResizeRange)
 		{
 			SizePasser(pAllSpawns, false);
@@ -558,7 +558,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		}
 		else if (!_strnicmp(szCurArg, "target", 7))
 		{
-			PSPAWNINFO pTheTarget = (PSPAWNINFO)pTarget;
+			PSPAWNINFO pTheTarget = pTarget;
 			if (pTheTarget && GetGameState() == GAMESTATE_INGAME && pTheTarget->SpawnID)
 			{
 				ChangeSize(pTheTarget, AS_Config.SizeTarget);
@@ -576,7 +576,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		{
 			if (!ToggleOption("Self", &AS_Config.OptSelf))
 			{
-				if ((pLocalPlayer)->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
+				if (pLocalPlayer->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
 				else ChangeSize(pCharSpawn, ZERO_SIZE);
 			}
 		}
@@ -704,17 +704,16 @@ void MQ2AutoSizeImGuiSettingsPanel()
 	ImGui::Text("Configure per spawn type AutoSize settings");
 	for (const SpawnTypeCheckbox& cb : checkboxes)
 	{
+		ImGui::PushID(cb.value);
 		bool tempValue = *cb.value;
-		char buf[32];
-		sprintf_s(buf, "##%s", cb.name);
-		if (ImGui::Checkbox(buf, &tempValue))
+		if (ImGui::Checkbox("##checkbox", &tempValue))
 		{
 			switch (cb.asType)
 			{
 			case AS_SELF:
 				if (!ToggleOption(cb.name, cb.value))
 				{
-					if ((pLocalPlayer)->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
+					if (pLocalPlayer->Mount) ChangeSize(pLocalPlayer, ZERO_SIZE);
 					else ChangeSize(pCharSpawn, ZERO_SIZE);
 				}
 				break;
@@ -739,6 +738,7 @@ void MQ2AutoSizeImGuiSettingsPanel()
 				SetSizeConfig(cb.name, tempSize, cb.size);
 			}
 		}
+		ImGui::PopID();
 	}
 	if (AS_Config.OptByZone) SpawnListResize(false);
 }
