@@ -37,7 +37,7 @@ void DoGroupCommand(std::string_view command, bool includeSelf);
 void ChooseInstructionPlugin();
 void emulate(std::string type);
 void DrawAutoSize_MQSettingsPanel();
-int optZonewide = 1; // defaults to selecting Range
+int optZonewide = 2; // defaults to selecting Range
 int selectedComms = 0; // defaults to none, OnPulse will query for updates
 int previousRangeDistance = 0;
 bool loaded_dannet = false;
@@ -60,14 +60,13 @@ enum class ResizeMode {
 class COurSizes {
 public:
 	COurSizes() {
-		OptPC = OptByRange = true;
+		OptPC = true;
 		OptNPC = OptPet = OptMerc = OptMount = OptCorpse = OptSelf = OptEverything = OptAutoSave = false;
 		ResizeRange = 50;
-		SizeDefault = SizePC = SizeNPC = SizePet = SizeMerc = SizeTarget = SizeMount = SizeCorpse = SizeSelf = 1;
+		SizeDefault = SizePC = SizeNPC = SizePet = SizeMerc = SizeMount = SizeCorpse = SizeSelf = 1;
 	};
 
 	bool OptAutoSave;
-	bool OptByRange;
 	bool OptEverything;
 	bool OptPC;
 	bool OptNPC;
@@ -83,7 +82,6 @@ public:
 	int SizeNPC;
 	int SizePet;
 	int SizeMerc;
-	int SizeTarget;
 	int SizeMount;
 	int SizeCorpse;
 	int SizeSelf;
@@ -104,14 +102,12 @@ public:
 		ResizeMounts,
 		ResizeCorpse,
 		ResizeSelf,
-		SizeByRange,
 		Range,
 		SizeDefault,
 		SizePC,
 		SizeNPC,
 		SizePets,
 		SizeMercs,
-		SizeTarget,
 		SizeMounts,
 		SizeCorpse,
 		SizeSelf
@@ -127,14 +123,12 @@ public:
 		TypeMember(ResizeMounts);
 		TypeMember(ResizeCorpse);
 		TypeMember(ResizeSelf);
-		TypeMember(SizeByRange);
 		TypeMember(Range);
 		TypeMember(SizeDefault);
 		TypeMember(SizePC);
 		TypeMember(SizeNPC);
 		TypeMember(SizePets);
 		TypeMember(SizeMercs);
-		TypeMember(SizeTarget);
 		TypeMember(SizeMounts);
 		TypeMember(SizeCorpse);
 		TypeMember(SizeSelf);
@@ -185,10 +179,6 @@ public:
 				Dest.Int = AS_Config.OptSelf;
 				Dest.Type = datatypes::pBoolType;
 				return true;
-			case SizeByRange:
-				Dest.Int = AS_Config.OptByRange;
-				Dest.Type = datatypes::pBoolType;
-				return true;
 			case Range:
 				Dest.Int = AS_Config.ResizeRange;
 				Dest.Type = datatypes::pIntType;
@@ -211,10 +201,6 @@ public:
 				return true;
 			case SizeMercs:
 				Dest.Int = AS_Config.SizeMerc;
-				Dest.Type = datatypes::pIntType;
-				return true;
-			case SizeTarget:
-				Dest.Int = AS_Config.SizeTarget;
 				Dest.Type = datatypes::pIntType;
 				return true;
 			case SizeMounts:
@@ -306,14 +292,12 @@ void LoadINI() {
 	AS_Config.OptMount = getOptionValue("Config", "ResizeMounts", "off");
 	AS_Config.OptCorpse = getOptionValue("Config", "ResizeCorpse", "off");
 	AS_Config.OptSelf = getOptionValue("Config", "ResizeSelf", "off");
-	AS_Config.OptByRange = getOptionValue("Config", "SizeByRange", "off");
 	AS_Config.ResizeRange = getSaneSize("Config", "Range", AS_Config.ResizeRange);
 	AS_Config.SizeDefault = getSaneSize("Config", "SizeDefault", MIN_SIZE);
 	AS_Config.SizePC = getSaneSize("Config", "SizePC", MIN_SIZE);
 	AS_Config.SizeNPC = getSaneSize("Config", "SizeNPC", MIN_SIZE);
 	AS_Config.SizePet = getSaneSize("Config", "SizePets", MIN_SIZE);
 	AS_Config.SizeMerc = getSaneSize("Config", "SizeMercs",	MIN_SIZE);
-	AS_Config.SizeTarget = getSaneSize("Config", "SizeTarget", MIN_SIZE);
 	AS_Config.SizeMount = getSaneSize("Config", "SizeMounts", MIN_SIZE);
 	AS_Config.SizeCorpse = getSaneSize("Config", "SizeCorpse", MIN_SIZE);
 	AS_Config.SizeSelf = getSaneSize("Config", "SizeSelf", MIN_SIZE);
@@ -334,7 +318,6 @@ void SaveINI() {
 	WritePrivateProfileString("Config", "ResizeMounts", AS_Config.OptMount ? "on" : "off", INIFileName);
 	WritePrivateProfileString("Config", "ResizeCorpse", AS_Config.OptCorpse ? "on" : "off", INIFileName);
 	WritePrivateProfileString("Config", "ResizeSelf", AS_Config.OptSelf ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "SizeByRange", AS_Config.OptByRange ? "on" : "off", INIFileName);
 	// this avoids writing 1000 to INI
 	if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 		WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
@@ -344,7 +327,6 @@ void SaveINI() {
 	WritePrivateProfileString("Config", "SizeNPC", std::to_string(AS_Config.SizeNPC), INIFileName);
 	WritePrivateProfileString("Config", "SizePets", std::to_string(AS_Config.SizePet), INIFileName);
 	WritePrivateProfileString("Config", "SizeMercs", std::to_string(AS_Config.SizeMerc), INIFileName);
-	WritePrivateProfileString("Config", "SizeTarget", std::to_string(AS_Config.SizeTarget), INIFileName);
 	WritePrivateProfileString("Config", "SizeMounts", std::to_string(AS_Config.SizeMount), INIFileName);
 	WritePrivateProfileString("Config", "SizeCorpse", std::to_string(AS_Config.SizeCorpse), INIFileName);
 	WritePrivateProfileString("Config", "SizeSelf", std::to_string(AS_Config.SizeSelf), INIFileName);
@@ -460,7 +442,7 @@ PLUGIN_API void OnEndZone() {
 }
 
 PLUGIN_API void OnPulse() {
-	if (GetGameState() != GAMESTATE_INGAME || !AS_Config.OptByRange) return;
+	if (GetGameState() != GAMESTATE_INGAME) return;
 	if (uiSkipPulse < SKIP_PULSES) {
 		uiSkipPulse++;
 		return;
@@ -496,9 +478,9 @@ void OutputHelp() {
 	WriteChatf("  \ag/autosize\ax \aydist\ax - Toggles distance-based AutoSize on/off");
 	WriteChatf("  \ag/autosize\ax \ayrange #\ax - Sets range for distance checking");
 	WriteChatf("--- Valid Resize Toggles ---");
-	WriteChatf("  \ag/autosize\ax [ \aypc\ax | \aynpc\ax | \aypets\ax | \aymercs\ax | \aymounts\ax | \aycorpse\ax | \aytarget\ax | \ayeverything\ax | \ayself\ax ]");
+	WriteChatf("  \ag/autosize\ax [ \aypc\ax | \aynpc\ax | \aypets\ax | \aymercs\ax | \aymounts\ax | \aycorpse\ax | \ayeverything\ax | \ayself\ax ]");
 	WriteChatf("--- Valid Size Syntax (1 to 250) ---");
-	WriteChatf("  \ag/autosize\ax [ \aysize\ax | \aysizepc\ax | \aysizenpc\ax | \aysizepets\ax | \aysizemercs\ax | \aysizemounts\ax | \aysizecorpse\ax | \aysizetarget\ax | \aysizeself\ax ] [ \ay#\ax ]");
+	WriteChatf("  \ag/autosize\ax [ \aysizepc\ax | \aysizenpc\ax | \aysizepets\ax | \aysizemercs\ax | \aysizemounts\ax | \aysizecorpse\ax | \aysizeself\ax ] [ \ay#\ax ]");
 	WriteChatf("--- Other Valid Commands ---");
 	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
 }
@@ -540,7 +522,7 @@ void OutputStatus() {
 		AS_Config.SizeMerc,
 		AS_Config.SizeMount,
 		AS_Config.SizeCorpse,
-		AS_Config.SizeTarget,
+		0, // no longer available but left to ensure that no random script that reads this, breaks.
 		AS_Config.SizeSelf,
 		AS_Config.SizeDefault);
 }
@@ -640,9 +622,6 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 	}
 	else if (ci_equals(szCurArg, "sizemercs")) {
 		SetSizeConfig("Mercs", iNewSize, &AS_Config.SizeMerc);
-	}
-	else if (ci_equals(szCurArg, "sizetarget")) {
-		SetSizeConfig("Target", iNewSize, &AS_Config.SizeTarget);
 	}
 	else if (ci_equals(szCurArg, "sizemounts")) {
 		SetSizeConfig("Mounts", iNewSize, &AS_Config.SizeMount);
@@ -987,9 +966,6 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn(); ImGui::Text("/autosize range #");
 				ImGui::TableNextColumn(); ImGui::Text("Sets range for distance-based AutoSize");
 				ImGui::TableNextRow();
-				ImGui::TableNextColumn(); ImGui::Text("/autosize size #");
-				ImGui::TableNextColumn(); ImGui::Text("Sets default size for everything");
-				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize sizepc #");
 				ImGui::TableNextColumn(); ImGui::Text("Sets size for PC spawn types");
 				ImGui::TableNextRow();
@@ -998,9 +974,6 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize sizepets #");
 				ImGui::TableNextColumn(); ImGui::Text("Sets size for pet spawn types");
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn(); ImGui::Text("/autosize sizetarget #");
-				ImGui::TableNextColumn(); ImGui::Text("Sets size for target parameter");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize sizemercs #");
 				ImGui::TableNextColumn(); ImGui::Text("Sets size for mercenary spawn types");
@@ -1033,9 +1006,6 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize load");
 				ImGui::TableNextColumn(); ImGui::Text("Load settings from INI file (auto on plugin load)");
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn(); ImGui::Text("/autosize target");
-				ImGui::TableNextColumn(); ImGui::Text("Resizes your target to sizetarget size");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize autosave");
 				ImGui::TableNextColumn(); ImGui::Text("Automatically save settings to INI file when an option is toggled or size is set");
@@ -1145,9 +1115,8 @@ void ChooseInstructionPlugin() {
 void emulate(std::string type) {
 	if (type == "zonewide") {
 		previousRangeDistance = AS_Config.ResizeRange;
-		optZonewide = 0;
+		optZonewide = static_cast<int>(ResizeMode::Zonewide);
 		AS_Config.ResizeRange = 1000;
-		AS_Config.OptByRange = true;
 		WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
 		WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \agenabled\ax!", MODULE_NAME);
 		SpawnListResize(false);
@@ -1155,8 +1124,7 @@ void emulate(std::string type) {
 	}
 	else if (type == "range") {
 		AS_Config.ResizeRange = previousRangeDistance;
-		optZonewide = 1;
-		AS_Config.OptByRange = true;
+		optZonewide = static_cast<int>(ResizeMode::Range);
 		WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \ardisabled\ax!", MODULE_NAME);
 		WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \agenabled\ax!", MODULE_NAME);
 		SpawnListResize(false);
