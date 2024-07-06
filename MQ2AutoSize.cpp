@@ -61,13 +61,12 @@ class COurSizes {
 public:
 	COurSizes() {
 		OptPC = true;
-		OptNPC = OptPet = OptMerc = OptMount = OptCorpse = OptSelf = OptEverything = OptAutoSave = false;
+		OptNPC = OptPet = OptMerc = OptMount = OptCorpse = OptSelf = OptAutoSave = false;
 		ResizeRange = 50;
 		SizeDefault = SizePC = SizeNPC = SizePet = SizeMerc = SizeMount = SizeCorpse = SizeSelf = 1;
 	};
 
 	bool OptAutoSave;
-	bool OptEverything;
 	bool OptPC;
 	bool OptNPC;
 	bool OptPet;
@@ -392,11 +391,6 @@ void SizePasser(PSPAWNINFO pSpawn, bool bReset) {
 		default:
 			break;
 	}
-
-	// no longer used since the Everything feature was changed to work
-	//if (AS_Config.OptEverything && pSpawn->SpawnID != pLPlayer->SpawnID) {
-	//	ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeDefault);
-	//}
 }
 
 void ResetAllByType(eSpawnType OurType) {
@@ -513,8 +507,8 @@ void OutputStatus() {
 		AS_Config.OptMount ? szOn : szOff,
 		AS_Config.OptCorpse ? szOn : szOff,
 		AS_Config.OptSelf ? szOn : szOff,
-		//AS_Config.OptEverything ? szOn : szOff
-		szOff);
+		szOff // // no longer available but left to ensure that no random script that reads this, breaks.
+	);
 	WriteChatf("Sizes: PC(\ag%d\ax) NPC(\ag%d\ax) Pets(\ag%d\ax) Mercs(\ag%d\ax) Mounts(\ag%d\ax) Corpses(\ag%d\ax) Target(\ag%d\ax) Self(\ag%d\ax) Everything(\ag%d\ax)",
 		AS_Config.SizePC,
 		AS_Config.SizeNPC,
@@ -524,7 +518,8 @@ void OutputStatus() {
 		AS_Config.SizeCorpse,
 		0, // no longer available but left to ensure that no random script that reads this, breaks.
 		AS_Config.SizeSelf,
-		AS_Config.SizeDefault);
+		0 // no longer available but left to ensure that no random script that reads this, breaks.
+	);
 }
 
 bool ToggleOption(const char* pszToggleOutput, bool* pbOption) {
