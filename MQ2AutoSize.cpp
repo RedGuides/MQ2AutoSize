@@ -63,7 +63,7 @@ public:
 		OptPC = true;
 		OptNPC = OptPet = OptMerc = OptMount = OptCorpse = OptSelf = OptAutoSave = false;
 		ResizeRange = 50;
-		SizeDefault = SizePC = SizeNPC = SizePet = SizeMerc = SizeMount = SizeCorpse = SizeSelf = 1;
+		SizePC = SizeNPC = SizePet = SizeMerc = SizeMount = SizeCorpse = SizeSelf = 1;
 	};
 
 	bool OptAutoSave;
@@ -76,7 +76,6 @@ public:
 	bool OptSelf;
 
 	int ResizeRange;
-	int SizeDefault;
 	int SizePC;
 	int SizeNPC;
 	int SizePet;
@@ -102,7 +101,6 @@ public:
 		ResizeCorpse,
 		ResizeSelf,
 		Range,
-		SizeDefault,
 		SizePC,
 		SizeNPC,
 		SizePets,
@@ -123,7 +121,6 @@ public:
 		TypeMember(ResizeCorpse);
 		TypeMember(ResizeSelf);
 		TypeMember(Range);
-		TypeMember(SizeDefault);
 		TypeMember(SizePC);
 		TypeMember(SizeNPC);
 		TypeMember(SizePets);
@@ -180,10 +177,6 @@ public:
 				return true;
 			case Range:
 				Dest.Int = AS_Config.ResizeRange;
-				Dest.Type = datatypes::pIntType;
-				return true;
-			case SizeDefault:
-				Dest.Int = AS_Config.SizeDefault;
 				Dest.Type = datatypes::pIntType;
 				return true;
 			case SizePC:
@@ -292,7 +285,6 @@ void LoadINI() {
 	AS_Config.OptCorpse = getOptionValue("Config", "ResizeCorpse", "off");
 	AS_Config.OptSelf = getOptionValue("Config", "ResizeSelf", "off");
 	AS_Config.ResizeRange = getSaneSize("Config", "Range", AS_Config.ResizeRange);
-	AS_Config.SizeDefault = getSaneSize("Config", "SizeDefault", MIN_SIZE);
 	AS_Config.SizePC = getSaneSize("Config", "SizePC", MIN_SIZE);
 	AS_Config.SizeNPC = getSaneSize("Config", "SizeNPC", MIN_SIZE);
 	AS_Config.SizePet = getSaneSize("Config", "SizePets", MIN_SIZE);
@@ -321,7 +313,6 @@ void SaveINI() {
 	if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 		WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
 	}
-	WritePrivateProfileString("Config", "SizeDefault", std::to_string(AS_Config.SizeDefault), INIFileName);
 	WritePrivateProfileString("Config", "SizePC", std::to_string(AS_Config.SizePC), INIFileName);
 	WritePrivateProfileString("Config", "SizeNPC", std::to_string(AS_Config.SizeNPC), INIFileName);
 	WritePrivateProfileString("Config", "SizePets", std::to_string(AS_Config.SizePet), INIFileName);
@@ -602,8 +593,6 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 		return;
 	}
 	else if (ci_equals(szCurArg, "size")) {
-		// deprecated because having a default size to be applied to things which are not opt'd to be resized makes no sense.
-		//SetSizeConfig("Default", iNewSize, &AS_Config.SizeDefault);
 		WriteChatf("\ay%s\aw:: This feature (\ay%s\ax) has been deprecated. Check /mqsetting -> plugins -> AutoSize.", MODULE_NAME, szCurArg);
 	}
 	else if (ci_equals(szCurArg, "sizepc")) {
