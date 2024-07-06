@@ -911,6 +911,136 @@ void DrawAutoSize_MQSettingsPanel()
 	ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
 	if (ImGui::BeginTabBar("AutoSizeTabBar", tab_bar_flags))
 	{
+				
+		if (ImGui::BeginTabItem("Options"))
+		{
+			ImGui::SeparatorText("General");
+
+			if (ImGui::Checkbox("Enable auto saving of configuration", &AS_Config.OptAutoSave)) {
+				AS_Config.OptAutoSave = !AS_Config.OptAutoSave;
+				DoCommandf("/autosize autosave");
+			}
+			if (ImGui::RadioButton("Zonewide (max clipping plane)", &optZonewide, 0)) {
+				optZonewide = 0; // this is not a boolean, this indicates which radio button to enable
+				previousRangeDistance = AS_Config.ResizeRange;
+				AS_Config.ResizeRange = 1000;
+				AS_Config.OptByRange = true; // TODO: enable by default, comment out any/all zonewide related things
+				SpawnListResize(false);
+			}
+			if (ImGui::BeginTable("OptionsResizeRangeTable", 2, ImGuiTableFlags_RowBg)) {
+				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 20.0f);
+				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+				ImGui::TableNextColumn();
+				if (ImGui::RadioButton("", &optZonewide, 1)) {
+					optZonewide = 1; // this is not a boolean, this indicates which radio button to enable
+					AS_Config.ResizeRange = previousRangeDistance;
+					AS_Config.OptByRange = true;
+					SpawnListResize(false);
+				}
+				ImGui::TableNextColumn();
+				ImGui::BeginDisabled(AS_Config.ResizeRange == 1000);
+				ImGui::PushItemWidth(50.0f);
+				ImGui::DragInt("Range distance (recommended setting)##inputRD", &AS_Config.ResizeRange, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::EndTable();
+			}
+			ImGui::NewLine();
+			if (ImGui::Button("Display status output")) {
+				DoCommandf("/autosize status");
+			}
+			ImGui::SeparatorText("Toggles");
+			if (ImGui::BeginTable("OptionsResizeSelfTable", 2, ImGuiTableFlags_RowBg)) {
+				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 20.0f);
+				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+				ImGui::TableNextColumn();
+				if (ImGui::Checkbox("##OptSelf", &AS_Config.OptSelf)) {
+					AS_Config.OptSelf = !AS_Config.OptSelf;
+					DoCommandf("/autosize self");
+				}
+				ImGui::TableNextColumn();
+				ImGui::SetNextItemWidth(50.0f);
+				ImGui::BeginDisabled(!AS_Config.OptSelf);
+				ImGui::DragInt("Resize: Self##inputSS", &AS_Config.SizeSelf, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (ImGui::Checkbox("##OptPC", &AS_Config.OptPC)) {
+					AS_Config.OptPC = !AS_Config.OptPC;
+					DoCommandf("/autosize pc");
+				}
+				ImGui::TableNextColumn();
+				ImGui::SetNextItemWidth(50.0f);
+				ImGui::BeginDisabled(!AS_Config.OptPC);
+				ImGui::DragInt("Resize: Other player(s) (incluldes those mounted)##inputOP", &AS_Config.SizePC, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (ImGui::Checkbox("##OptPet", &AS_Config.OptPet)) {
+					AS_Config.OptPet = !AS_Config.OptPet;
+					DoCommandf("/autosize pets");
+				}
+				ImGui::TableNextColumn();
+				ImGui::PushItemWidth(50.0f);
+				ImGui::BeginDisabled(!AS_Config.OptPet);
+				ImGui::DragInt("Resize: Pets##inputPS", &AS_Config.SizePet, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (ImGui::Checkbox("##OptMerc", &AS_Config.OptMerc)) {
+					AS_Config.OptMerc = !AS_Config.OptMerc;
+					DoCommandf("/autosize mercs");
+				}
+				ImGui::TableNextColumn();
+				ImGui::PushItemWidth(50.0f);
+				ImGui::BeginDisabled(!AS_Config.OptMerc);
+				ImGui::DragInt("Resize: Mercs##inputMercSize", &AS_Config.SizeMerc, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (ImGui::Checkbox("##OptMount", &AS_Config.OptMount)) {
+					AS_Config.OptMount = !AS_Config.OptMount;
+					DoCommandf("/autosize mounts");
+				}
+				ImGui::TableNextColumn();
+				ImGui::PushItemWidth(50.0f);
+				ImGui::BeginDisabled(!AS_Config.OptMount);
+				ImGui::DragInt("Resize: Mounts and the Player(s) on them##inputMountSize", &AS_Config.SizeMount, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (ImGui::Checkbox("##OptCorpse", &AS_Config.OptCorpse)) {
+					AS_Config.OptCorpse = !AS_Config.OptCorpse;
+					DoCommandf("/autosize corpse");
+				}
+				ImGui::TableNextColumn();
+				ImGui::PushItemWidth(50.0f);
+				ImGui::BeginDisabled(!AS_Config.OptCorpse);
+				ImGui::DragInt("Resize: Corpse(s)##inputCS", &AS_Config.SizeCorpse, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (ImGui::Checkbox("##OptNPC", &AS_Config.OptNPC)) {
+					AS_Config.OptNPC = !AS_Config.OptNPC;
+					DoCommandf("/autosize npc");
+				}
+				ImGui::TableNextColumn();
+				ImGui::PushItemWidth(50.0f);
+				ImGui::BeginDisabled(!AS_Config.OptNPC);
+				ImGui::DragInt("Resize: NPC(s)##inputNS", &AS_Config.SizeNPC, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				ImGui::EndDisabled();
+				ImGui::EndTable();
+			}
+			
+			// display the button if any option is not enabled
+			if (!AS_Config.OptCorpse || !AS_Config.OptMerc || !AS_Config.OptMount || !AS_Config.OptNPC || !AS_Config.OptPC || !AS_Config.OptPet || !AS_Config.OptSelf) {
+				ImGui::NewLine();
+				if (ImGui::Button("Resize Everything")) {
+					DoCommandf("/autosize everything");
+				}
+		}
+			ImGui::EndTabItem();
+		}
+				
 		if (ImGui::BeginTabItem("Commands"))
 		{
 			ImGui::SeparatorText("Toggles");
@@ -947,8 +1077,8 @@ void DrawAutoSize_MQSettingsPanel()
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize everything");
 				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize all spawn types");
-			ImGui::EndTable();
-			ImGui::Unindent();
+				ImGui::EndTable();
+				ImGui::Unindent();
 			}
 
 			ImGui::SeparatorText("Size configuration (valid: 1 to 250)");
@@ -985,7 +1115,7 @@ void DrawAutoSize_MQSettingsPanel()
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize sizeself #");
 				ImGui::TableNextColumn(); ImGui::Text("Sets size for your character");
-			ImGui::EndTable();
+				ImGui::EndTable();
 			}
 			ImGui::Unindent();
 
@@ -1011,107 +1141,10 @@ void DrawAutoSize_MQSettingsPanel()
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize autosave");
 				ImGui::TableNextColumn(); ImGui::Text("Automatically save settings to INI file when an option is toggled or size is set");
-			ImGui::EndTable();
+				ImGui::EndTable();
 			}
 			ImGui::Unindent();
 
-		ImGui::EndTabItem();
-		}
-		
-		if (ImGui::BeginTabItem("Options"))
-		{
-			ImGui::SeparatorText("General");
-			if (ImGui::RadioButton("Zonewide (really max clipping plane)", &optZonewide, 0)) {
-				optZonewide = 0; // this is not a boolean, this indicates which radio button to enable
-				previousRangeDistance = AS_Config.ResizeRange;
-				AS_Config.ResizeRange = 1000;
-				AS_Config.OptByRange = true; // TODO: enable by default, comment out any/all zonewide related things
-				SpawnListResize(false);
-			}
-			if (ImGui::RadioButton("Range distance (recommended setting)", &optZonewide, 1)) {
-				optZonewide = 1; // this is not a boolean, this indicates which radio button to enable
-				AS_Config.ResizeRange = previousRangeDistance;
-				AS_Config.OptByRange = true;
-				SpawnListResize(false);
-			}
-			if (ImGui::Checkbox("Enable auto saving of configuration", &AS_Config.OptAutoSave)) {
-				AS_Config.OptAutoSave = !AS_Config.OptAutoSave;
-				DoCommandf("/autosize autosave");
-			}
-			ImGui::NewLine();
-			if (ImGui::Button("Display status output")) {
-				DoCommandf("/autosize status");
-			}
-
-			ImGui::SeparatorText("Toggles");
-			if (ImGui::Checkbox("Resize: Yourself", &AS_Config.OptSelf)) {
-				AS_Config.OptSelf = !AS_Config.OptSelf;
-				DoCommandf("/autosize self");
-			}
-			if (ImGui::Checkbox("Resize: Other players (incluldes those mounted)", &AS_Config.OptPC)) {
-				AS_Config.OptPC = !AS_Config.OptPC;
-				DoCommandf("/autosize pc");
-			}
-			if (ImGui::Checkbox("Resize: Pets", &AS_Config.OptPet)) {
-				AS_Config.OptPet = !AS_Config.OptPet;
-				DoCommandf("/autosize pets");
-			}
-			if (ImGui::Checkbox("Resize: Mercs", &AS_Config.OptMerc)) {
-				AS_Config.OptMerc = !AS_Config.OptMerc;
-				DoCommandf("/autosize mercs");
-			}
-			if (ImGui::Checkbox("Resize: Mounts and the Player(s) on them", &AS_Config.OptMount)) {
-				AS_Config.OptMount = !AS_Config.OptMount;
-				DoCommandf("/autosize mounts");
-			}
-			if (ImGui::Checkbox("Resize: Corpse(s)", &AS_Config.OptCorpse)) {
-				AS_Config.OptCorpse = !AS_Config.OptCorpse;
-				DoCommandf("/autosize corpse");
-			}
-
-			if (ImGui::Checkbox("Resize: NPC(s)", &AS_Config.OptNPC)) {
-				AS_Config.OptNPC = !AS_Config.OptNPC;
-				DoCommandf("/autosize npc");
-			}
-			
-			// display the button if any option is not enabled
-			if (!AS_Config.OptCorpse || !AS_Config.OptMerc || !AS_Config.OptMount || !AS_Config.OptNPC || !AS_Config.OptPC || !AS_Config.OptPet || !AS_Config.OptSelf) {
-				ImGui::NewLine();
-				if (ImGui::Button("Resize Everything")) {
-					DoCommandf("/autosize everything");
-				}
-		}
-			ImGui::EndTabItem();
-		}
-		
-		if (ImGui::BeginTabItem("Settings"))
-		{
-			// included in case code review asks for it to be
-			// provided instead of being a hidden value where
-			// no one is aware of how it works
-			/*
-			ImGui::BeginDisabled(true);
-			ImGui::InputInt("Zonewide##input", &FAR_CLIP_PLANE, 10, 1000);
-			ImGui::EndDisabled();
-			*/
-			ImGui::BeginDisabled(AS_Config.ResizeRange == 1000);
-			ImGui::DragInt("Range distance##inputRD", &AS_Config.ResizeRange, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::EndDisabled();
-			ImGui::DragInt("Self size##inputSS",		&AS_Config.SizeSelf,	1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::DragInt("Other player size##inputSS",&AS_Config.SizePC,		1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::DragInt("Pet size##inputPS",			&AS_Config.SizePet,		1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::DragInt("Merc size##inputMercSize",	&AS_Config.SizeMerc,	1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::DragInt("Mount size##inputMountSize",&AS_Config.SizeMount,	1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::DragInt("Corpse size##inputCS",		&AS_Config.SizeCorpse,	1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::DragInt("Everything size##inputES",	&AS_Config.SizeDefault, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			ImGui::DragInt("NPC size##inputNS",			&AS_Config.SizeNPC,		1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
-			// using SizeTarget will produce a bad experience
-			// while having other options enabled
-			/*
-			if (ImGui::DragInt("Target size##inputTS", &AS_Config.SizeTarget, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp)) {
-				DoCommandf("/squelch /autosize target");
-			}
-			*/
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();
