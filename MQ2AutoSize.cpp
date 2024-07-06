@@ -33,39 +33,49 @@ void SpawnListResize(bool bReset);
 // added for MQ Settings imgui panel
 bool group_control_checked = false;
 bool group_control_enabled = false;
-const char* comms = "None";
 void DoGroupCommand(std::string_view command, bool includeSelf);
 void ChooseInstructionPlugin();
+void emulate(std::string type);
 void DrawAutoSize_MQSettingsPanel();
-int optZonewide = 1;
+int optZonewide = 1; // defaults to selecting Range
+int selectedComms = 0; // defaults to none, OnPulse will query for updates
 int previousRangeDistance = 0;
+bool loaded_dannet = false;
+bool loaded_eqbc = false;
+unsigned long long commsCheck;
+
+enum class CommunicationMode {
+	None = 0,
+	DanNet = 1,
+	EQBC = 2
+};
+
+enum class ResizeMode {
+	None = 0,
+	Zonewide = 1,
+	Range = 2
+};
 
 // our configuration
-class COurSizes
-{
+class COurSizes {
 public:
-	COurSizes()
-	{
-		// TODO: maybe remove later, for now commented out Zonewide
-		// OptPC = OptByZone = true;
-		OptPC = true;
-		OptNPC = OptPet = OptMerc = OptMount = OptCorpse = OptSelf = OptEverything = OptByRange = OptAutoSave = false;
+	COurSizes() {
+		OptPC = OptByRange = true;
+		OptNPC = OptPet = OptMerc = OptMount = OptCorpse = OptSelf = OptEverything = OptAutoSave = false;
 		ResizeRange = 50;
 		SizeDefault = SizePC = SizeNPC = SizePet = SizeMerc = SizeTarget = SizeMount = SizeCorpse = SizeSelf = 1;
 	};
 
-	bool  OptAutoSave;
-	bool  OptByRange;
-	// TODO: maybe remove later, for now commented out Zonewide
-	// bool  OptByZone;
-	bool  OptEverything;
-	bool  OptPC;
-	bool  OptNPC;
-	bool  OptPet;
-	bool  OptMerc;
-	bool  OptMount;
-	bool  OptCorpse;
-	bool  OptSelf;
+	bool OptAutoSave;
+	bool OptByRange;
+	bool OptEverything;
+	bool OptPC;
+	bool OptNPC;
+	bool OptPet;
+	bool OptMerc;
+	bool OptMount;
+	bool OptCorpse;
+	bool OptSelf;
 
 	int ResizeRange;
 	int SizeDefault;
@@ -82,18 +92,15 @@ COurSizes AS_Config;
 
 // exposed TLO variables
 class MQ2AutoSizeType* pAutoSizeType = 0;
-class MQ2AutoSizeType : public MQ2Type
-{
+class MQ2AutoSizeType : public MQ2Type {
 public:
-	enum AutoSizeMembers
-	{
+	enum AutoSizeMembers {
 		Active,
 		AutoSave,
 		ResizePC,
 		ResizeNPC,
 		ResizePets,
 		ResizeMercs,
-		ResizeAll,
 		ResizeMounts,
 		ResizeCorpse,
 		ResizeSelf,
@@ -110,15 +117,13 @@ public:
 		SizeSelf
 	};
 
-	MQ2AutoSizeType() :MQ2Type("AutoSize")
-	{
+	MQ2AutoSizeType() :MQ2Type("AutoSize") {
 		TypeMember(Active);
 		TypeMember(AutoSave);
 		TypeMember(ResizePC);
 		TypeMember(ResizeNPC);
 		TypeMember(ResizePets);
 		TypeMember(ResizeMercs);
-		TypeMember(ResizeAll);
 		TypeMember(ResizeMounts);
 		TypeMember(ResizeCorpse);
 		TypeMember(ResizeSelf);
@@ -135,138 +140,124 @@ public:
 		TypeMember(SizeSelf);
 	}
 
-	~MQ2AutoSizeType()
-	{
-	}
+	~MQ2AutoSizeType() {}
 
-	bool GetMember(MQVarPtr VarPtr, const char* Member, char* Index, MQTypeVar& Dest)
-	{
+	bool GetMember(MQVarPtr VarPtr, const char* Member, char* Index, MQTypeVar& Dest) {
 
 		MQTypeMember* pMember = MQ2AutoSizeType::FindMember(Member);
 		if (!pMember)
 			return false;
 
-		switch ((AutoSizeMembers)pMember->ID)
-		{
-		case Active:
-			Dest.Int = AS_Config.OptPC || AS_Config.OptNPC || AS_Config.OptPet || AS_Config.OptMerc || AS_Config.OptMount || AS_Config.OptCorpse || AS_Config.OptSelf;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case AutoSave:
-			Dest.Int = AS_Config.OptAutoSave;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizePC:
-			Dest.Int = AS_Config.OptPC;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizeNPC:
-			Dest.Int = AS_Config.OptNPC;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizePets:
-			Dest.Int = AS_Config.OptPet;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizeMercs:
-			Dest.Int = AS_Config.OptMerc;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizeAll:
-			Dest.Int = AS_Config.OptEverything;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizeMounts:
-			Dest.Int = AS_Config.OptMount;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizeCorpse:
-			Dest.Int = AS_Config.OptCorpse;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case ResizeSelf:
-			Dest.Int = AS_Config.OptSelf;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case SizeByRange:
-			Dest.Int = AS_Config.OptByRange;
-			Dest.Type = datatypes::pBoolType;
-			return true;
-		case Range:
-			Dest.Int = AS_Config.ResizeRange;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizeDefault:
-			Dest.Int = AS_Config.SizeDefault;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizePC:
-			Dest.Int = AS_Config.SizePC;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizeNPC:
-			Dest.Int = AS_Config.SizeNPC;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizePets:
-			Dest.Int = AS_Config.SizePet;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizeMercs:
-			Dest.Int = AS_Config.SizeMerc;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizeTarget:
-			Dest.Int = AS_Config.SizeTarget;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizeMounts:
-			Dest.Int = AS_Config.SizeMount;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizeCorpse:
-			Dest.Int = AS_Config.SizeCorpse;
-			Dest.Type = datatypes::pIntType;
-			return true;
-		case SizeSelf:
-			Dest.Int = AS_Config.SizeSelf;
-			Dest.Type = datatypes::pIntType;
-			return true;
+		switch ((AutoSizeMembers)pMember->ID) {
+			case Active:
+				Dest.Int = AS_Config.OptPC || AS_Config.OptNPC || AS_Config.OptPet || AS_Config.OptMerc || AS_Config.OptMount || AS_Config.OptCorpse || AS_Config.OptSelf;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case AutoSave:
+				Dest.Int = AS_Config.OptAutoSave;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case ResizePC:
+				Dest.Int = AS_Config.OptPC;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case ResizeNPC:
+				Dest.Int = AS_Config.OptNPC;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case ResizePets:
+				Dest.Int = AS_Config.OptPet;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case ResizeMercs:
+				Dest.Int = AS_Config.OptMerc;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case ResizeMounts:
+				Dest.Int = AS_Config.OptMount;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case ResizeCorpse:
+				Dest.Int = AS_Config.OptCorpse;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case ResizeSelf:
+				Dest.Int = AS_Config.OptSelf;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case SizeByRange:
+				Dest.Int = AS_Config.OptByRange;
+				Dest.Type = datatypes::pBoolType;
+				return true;
+			case Range:
+				Dest.Int = AS_Config.ResizeRange;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizeDefault:
+				Dest.Int = AS_Config.SizeDefault;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizePC:
+				Dest.Int = AS_Config.SizePC;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizeNPC:
+				Dest.Int = AS_Config.SizeNPC;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizePets:
+				Dest.Int = AS_Config.SizePet;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizeMercs:
+				Dest.Int = AS_Config.SizeMerc;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizeTarget:
+				Dest.Int = AS_Config.SizeTarget;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizeMounts:
+				Dest.Int = AS_Config.SizeMount;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizeCorpse:
+				Dest.Int = AS_Config.SizeCorpse;
+				Dest.Type = datatypes::pIntType;
+				return true;
+			case SizeSelf:
+				Dest.Int = AS_Config.SizeSelf;
+				Dest.Type = datatypes::pIntType;
+				return true;
 		}
 		return false;
 	}
 
-	bool ToString(MQVarPtr VarPtr, char* Destination)
-	{
+	bool ToString(MQVarPtr VarPtr, char* Destination) {
 		return true;
 	}
 };
 
-bool dataAutoSize(const char* szIndex, MQTypeVar& ret)
-{
+bool dataAutoSize(const char* szIndex, MQTypeVar& ret) {
 	ret.DWord = 1;
 	ret.Type = pAutoSizeType;
 	return true;
 }
 
 // class to access the ChangeHeight function
-class PlayerZoneClient_Hook
-{
+class PlayerZoneClient_Hook {
 public:
 	DETOUR_TRAMPOLINE_DEF(void, ChangeHeight_Trampoline, (float, float, float, bool))
-	void ChangeHeight_Detour(float newHeight, float cameraPos, float speedScale, bool unused)
-	{
+	void ChangeHeight_Detour(float newHeight, float cameraPos, float speedScale, bool unused) {
 		ChangeHeight_Trampoline(newHeight, cameraPos, speedScale, unused);
 	}
 
 	// this assures valid function call
-	void ChangeHeight_Wrapper(float fNewSize)
-	{
+	void ChangeHeight_Wrapper(float fNewSize) {
 		float fView = OTHER_SIZE;
 		PlayerClient* pSpawn = reinterpret_cast<PlayerClient*>(this);
 
-		if (pSpawn->SpawnID == pLocalPlayer->SpawnID)
-		{
+		if (pSpawn->SpawnID == pLocalPlayer->SpawnID) {
 			fView = ZERO_SIZE;
 		}
 
@@ -300,89 +291,73 @@ static bool getOptionValue(const char* section, const char* key, const char* def
  * @param defaultValue The default value to use if the key is not found or the value is invalid.
  * @return An integer representing the size value, clamped to be within the range of MIN_SIZE and MAX_SIZE.
  */
-static int getSaneSize(const std::string& section, const std::string& key, int defaultValue)
-{
+static int getSaneSize(const std::string& section, const std::string& key, int defaultValue) {
 	int size = GetPrivateProfileInt(section.c_str(), key.c_str(), defaultValue, INIFileName);
 	return std::clamp(size, MIN_SIZE, MAX_SIZE);
 }
 
-void LoadINI()
-{
-	// defaulted all to off
-	AS_Config.OptAutoSave	= getOptionValue("Config", "AutoSave",		"off");
-	AS_Config.OptPC			= getOptionValue("Config", "ResizePC",		"off");
-	AS_Config.OptNPC		= getOptionValue("Config", "ResizeNPC",		"off");
-	AS_Config.OptPet		= getOptionValue("Config", "ResizePets",	"off");
-	AS_Config.OptMerc		= getOptionValue("Config", "ResizeMercs",	"off");
-	// OptEverything didn't work. I've changed how "Everything" works and the
-	// user experience is much better. I left this for now.
-	//AS_Config.OptEverything	= getOptionValue("Config", "ResizeAll",		"off");
-	AS_Config.OptMount		= getOptionValue("Config", "ResizeMounts",	"off");
-	AS_Config.OptCorpse		= getOptionValue("Config", "ResizeCorpse",	"off");
-	AS_Config.OptSelf		= getOptionValue("Config", "ResizeSelf",	"off");
-	AS_Config.OptByRange	= getOptionValue("Config", "SizeByRange",	"off");
-
-	AS_Config.ResizeRange	= getSaneSize("Config", "Range",		AS_Config.ResizeRange);
-	AS_Config.SizeDefault	= getSaneSize("Config", "SizeDefault",	MIN_SIZE);
-	AS_Config.SizePC		= getSaneSize("Config", "SizePC",		MIN_SIZE);
-	AS_Config.SizeNPC		= getSaneSize("Config", "SizeNPC",		MIN_SIZE);
-	AS_Config.SizePet		= getSaneSize("Config", "SizePets",		MIN_SIZE);
-	AS_Config.SizeMerc		= getSaneSize("Config", "SizeMercs",	MIN_SIZE);
-	AS_Config.SizeTarget	= getSaneSize("Config", "SizeTarget",	MIN_SIZE);
-	AS_Config.SizeMount		= getSaneSize("Config", "SizeMounts",	MIN_SIZE);
-	AS_Config.SizeCorpse	= getSaneSize("Config", "SizeCorpse",	MIN_SIZE);
-	AS_Config.SizeSelf		= getSaneSize("Config", "SizeSelf",		MIN_SIZE);
+void LoadINI() {
+	// defaulted options to off
+	AS_Config.OptAutoSave = getOptionValue("Config", "AutoSave", "off");
+	AS_Config.OptPC = getOptionValue("Config", "ResizePC", "off");
+	AS_Config.OptNPC = getOptionValue("Config", "ResizeNPC", "off");
+	AS_Config.OptPet = getOptionValue("Config", "ResizePets", "off");
+	AS_Config.OptMerc = getOptionValue("Config", "ResizeMercs", "off");
+	AS_Config.OptMount = getOptionValue("Config", "ResizeMounts", "off");
+	AS_Config.OptCorpse = getOptionValue("Config", "ResizeCorpse", "off");
+	AS_Config.OptSelf = getOptionValue("Config", "ResizeSelf", "off");
+	AS_Config.OptByRange = getOptionValue("Config", "SizeByRange", "off");
+	AS_Config.ResizeRange = getSaneSize("Config", "Range", AS_Config.ResizeRange);
+	AS_Config.SizeDefault = getSaneSize("Config", "SizeDefault", MIN_SIZE);
+	AS_Config.SizePC = getSaneSize("Config", "SizePC", MIN_SIZE);
+	AS_Config.SizeNPC = getSaneSize("Config", "SizeNPC", MIN_SIZE);
+	AS_Config.SizePet = getSaneSize("Config", "SizePets", MIN_SIZE);
+	AS_Config.SizeMerc = getSaneSize("Config", "SizeMercs",	MIN_SIZE);
+	AS_Config.SizeTarget = getSaneSize("Config", "SizeTarget", MIN_SIZE);
+	AS_Config.SizeMount = getSaneSize("Config", "SizeMounts", MIN_SIZE);
+	AS_Config.SizeCorpse = getSaneSize("Config", "SizeCorpse", MIN_SIZE);
+	AS_Config.SizeSelf = getSaneSize("Config", "SizeSelf", MIN_SIZE);
 	WriteChatf("\ay%s\aw:: Configuration file loaded.", MODULE_NAME);
 	
-	// apply new INI read
-	// TODO: maybe remove later, for now commented out Zonewide
-	// if (GetGameState() == GAMESTATE_INGAME && pLocalPlayer && AS_Config.OptByZone) {
+	// apply new settings from INI read
 	if (GetGameState() == GAMESTATE_INGAME && pLocalPlayer) {
 		SpawnListResize(false);
 	}
 }
 
-void SaveINI()
-{
-	WritePrivateProfileString("Config", "AutoSave",		AS_Config.OptAutoSave ? "on" : "off",	INIFileName);
-	WritePrivateProfileString("Config", "ResizePC",		AS_Config.OptPC ? "on" : "off",			INIFileName);
-	WritePrivateProfileString("Config", "ResizeNPC",	AS_Config.OptNPC ? "on" : "off",		INIFileName);
-	WritePrivateProfileString("Config", "ResizePets",	AS_Config.OptPet ? "on" : "off",		INIFileName);
-	WritePrivateProfileString("Config", "ResizeMercs",	AS_Config.OptMerc ? "on" : "off",		INIFileName);
-	// no longer used since Everything feature was significantly changed
-	//WritePrivateProfileString("Config", "ResizeAll",	AS_Config.OptEverything ? "on" : "off",	INIFileName);
-	WritePrivateProfileString("Config", "ResizeMounts",	AS_Config.OptMount ? "on" : "off",		INIFileName);
-	WritePrivateProfileString("Config", "ResizeCorpse",	AS_Config.OptCorpse ? "on" : "off",		INIFileName);
-	WritePrivateProfileString("Config", "ResizeSelf",	AS_Config.OptSelf ? "on" : "off",		INIFileName);
-	WritePrivateProfileString("Config", "SizeByRange",	AS_Config.OptByRange ? "on" : "off",	INIFileName);
+void SaveINI() {
+	WritePrivateProfileString("Config", "AutoSave", AS_Config.OptAutoSave ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "ResizePC", AS_Config.OptPC ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "ResizeNPC", AS_Config.OptNPC ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "ResizePets", AS_Config.OptPet ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "ResizeMercs", AS_Config.OptMerc ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "ResizeMounts", AS_Config.OptMount ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "ResizeCorpse", AS_Config.OptCorpse ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "ResizeSelf", AS_Config.OptSelf ? "on" : "off", INIFileName);
+	WritePrivateProfileString("Config", "SizeByRange", AS_Config.OptByRange ? "on" : "off", INIFileName);
 	// this avoids writing 1000 to INI
 	if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 		WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
 	}
-	WritePrivateProfileString("Config", "SizeDefault",	std::to_string(AS_Config.SizeDefault),	INIFileName);
-	WritePrivateProfileString("Config", "SizePC",		std::to_string(AS_Config.SizePC),		INIFileName);
-	WritePrivateProfileString("Config", "SizeNPC",		std::to_string(AS_Config.SizeNPC),		INIFileName);
-	WritePrivateProfileString("Config", "SizePets",		std::to_string(AS_Config.SizePet),		INIFileName);
-	WritePrivateProfileString("Config", "SizeMercs",	std::to_string(AS_Config.SizeMerc),		INIFileName);
-	WritePrivateProfileString("Config", "SizeTarget",	std::to_string(AS_Config.SizeTarget),	INIFileName);
-	WritePrivateProfileString("Config", "SizeMounts",	std::to_string(AS_Config.SizeMount),	INIFileName);
-	WritePrivateProfileString("Config", "SizeCorpse",	std::to_string(AS_Config.SizeCorpse),	INIFileName);
-	WritePrivateProfileString("Config", "SizeSelf",		std::to_string(AS_Config.SizeSelf),		INIFileName);
+	WritePrivateProfileString("Config", "SizeDefault", std::to_string(AS_Config.SizeDefault), INIFileName);
+	WritePrivateProfileString("Config", "SizePC", std::to_string(AS_Config.SizePC), INIFileName);
+	WritePrivateProfileString("Config", "SizeNPC", std::to_string(AS_Config.SizeNPC), INIFileName);
+	WritePrivateProfileString("Config", "SizePets", std::to_string(AS_Config.SizePet), INIFileName);
+	WritePrivateProfileString("Config", "SizeMercs", std::to_string(AS_Config.SizeMerc), INIFileName);
+	WritePrivateProfileString("Config", "SizeTarget", std::to_string(AS_Config.SizeTarget), INIFileName);
+	WritePrivateProfileString("Config", "SizeMounts", std::to_string(AS_Config.SizeMount), INIFileName);
+	WritePrivateProfileString("Config", "SizeCorpse", std::to_string(AS_Config.SizeCorpse), INIFileName);
+	WritePrivateProfileString("Config", "SizeSelf", std::to_string(AS_Config.SizeSelf), INIFileName);
 	WriteChatf("\ay%s\aw:: Configuration file saved.", MODULE_NAME);
 }
 
-void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize)
-{
-	if (pChangeSpawn)
-	{
+void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize) {
+	if (pChangeSpawn) {
 		reinterpret_cast<PlayerZoneClient_Hook*>(pChangeSpawn)->ChangeHeight_Wrapper(fNewSize);
 	}
 }
 
-void SizePasser(PSPAWNINFO pSpawn, bool bReset)
-{
-	// TODO: maybe remove later, for now commented out Zonewide
-	// if ((!bReset && !AS_Config.OptByZone && !AS_Config.OptByRange) || GetGameState() != GAMESTATE_INGAME) return;
+void SizePasser(PSPAWNINFO pSpawn, bool bReset) {
 	if (GetGameState() != GAMESTATE_INGAME) {
 		return;
 	}
@@ -390,85 +365,74 @@ void SizePasser(PSPAWNINFO pSpawn, bool bReset)
 	PSPAWNINFO pLPlayer = (PSPAWNINFO)pLocalPlayer;
 	if (!pLPlayer || !pLPlayer->SpawnID || !pSpawn || !pSpawn->SpawnID) return;
 
-	if (pSpawn->SpawnID == pLPlayer->SpawnID)
-	{
+	if (pSpawn->SpawnID == pLPlayer->SpawnID) {
 		if (AS_Config.OptSelf) ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeSelf);
 		return;
 	}
 
-	switch (GetSpawnType(pSpawn))
-	{
-	case PC:
-		if (AS_Config.OptPC)
-		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePC);
-			return;
-		}
-		break;
-	case NPC:
-		if (AS_Config.OptNPC)
-		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeNPC);
-			return;
-		}
-		break;
-	case PET:
-		if (AS_Config.OptPet)
-		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePet);
-			return;
-		}
-		break;
-	case MERCENARY:
-		if (AS_Config.OptMerc)
-		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMerc);
-			return;
-		}
-		break;
-	case MOUNT:
-		if (AS_Config.OptMount && pSpawn->SpawnID != pLPlayer->SpawnID)
-		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMount);
-			return;
-		}
-		break;
-	case CORPSE:
-		if (AS_Config.OptCorpse)
-		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeCorpse);
-			return;
-		}
-		break;
-	default:
-		break;
+	switch (GetSpawnType(pSpawn)) {
+		case PC:
+			if (AS_Config.OptPC) {
+				ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePC);
+				return;
+			}
+			break;
+		case NPC:
+			if (AS_Config.OptNPC) {
+				ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeNPC);
+				return;
+			}
+			break;
+		case PET:
+			if (AS_Config.OptPet) {
+				ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePet);
+				return;
+			}
+			break;
+		case MERCENARY:
+			if (AS_Config.OptMerc) {
+				ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMerc);
+				return;
+			}
+			break;
+		case MOUNT:
+			if (AS_Config.OptMount && pSpawn->SpawnID != pLPlayer->SpawnID) {
+				ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMount);
+				return;
+			}
+			break;
+		case CORPSE:
+			if (AS_Config.OptCorpse) {
+				ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeCorpse);
+				return;
+			}
+			break;
+		default:
+			break;
 	}
 
-	// no longer used since Everything feature was changed to work
+	// no longer used since the Everything feature was changed to work
 	//if (AS_Config.OptEverything && pSpawn->SpawnID != pLPlayer->SpawnID) {
 	//	ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeDefault);
 	//}
 }
 
-void ResetAllByType(eSpawnType OurType)
-{
+void ResetAllByType(eSpawnType OurType) {
 	PSPAWNINFO pSpawn = (PSPAWNINFO)pSpawnList;
 	PSPAWNINFO pLPlayer = (PSPAWNINFO)pLocalPlayer;
 	if (GetGameState() != GAMESTATE_INGAME || !pLPlayer || !pLPlayer->SpawnID || !pSpawn || !pSpawn->SpawnID) {
 		return;
 	}
 
-	while (pSpawn)
-	{
-		if (pSpawn->SpawnID == pLPlayer->SpawnID)
-		{
+	while (pSpawn) {
+		if (pSpawn->SpawnID == pLPlayer->SpawnID) {
 			pSpawn = pSpawn->pNext;
 			continue;
 		}
 
 		eSpawnType ListType = GetSpawnType(pSpawn);
 		if (ListType == OurType) ChangeSize(pSpawn, ZERO_SIZE);
-		// Handle Everything resize all by using NONE
+		// Handle Everything resize all by using NONE type
 		// it's not a great option but we aren't using NONE 
 		// for anything else so its available for use
 		if (OurType == 0) {
@@ -478,66 +442,55 @@ void ResetAllByType(eSpawnType OurType)
 	}
 }
 
-void SpawnListResize(bool bReset)
-{
+void SpawnListResize(bool bReset) {
 	if (GetGameState() != GAMESTATE_INGAME) return;
 	PSPAWNINFO pSpawn = (PSPAWNINFO)pSpawnList;
-	while (pSpawn)
-	{
+	while (pSpawn) {
 		SizePasser(pSpawn, bReset);
 		pSpawn = pSpawn->pNext;
 	}
 }
 
-PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn)
-{
-	// TODO: maybe remove later, for now commented out Zonewide
-	// if (AS_Config.OptByZone) {
-		//SizePasser(pNewSpawn, false);
-	//}
+PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn) {
+	// nothing additional to perform over existing functionality
 }
 
-PLUGIN_API void OnEndZone()
-{
+PLUGIN_API void OnEndZone() {
 	SpawnListResize(false);
 }
 
-PLUGIN_API void OnPulse()
-{
+PLUGIN_API void OnPulse() {
 	if (GetGameState() != GAMESTATE_INGAME || !AS_Config.OptByRange) return;
-	if (uiSkipPulse < SKIP_PULSES)
-	{
+	if (uiSkipPulse < SKIP_PULSES) {
 		uiSkipPulse++;
 		return;
 	}
 
 	// imgui panel related
-	if (!group_control_enabled) {
-		group_control_enabled = true;
+	// check if communication plugins are still running and adjust UI as needed
+	if (GetTickCount64() > commsCheck) {
+		commsCheck = std::int64_t(commsCheck) + 1000; // only check again 1 second from now
 		ChooseInstructionPlugin();
 	}
+	
 
 	PSPAWNINFO pAllSpawns = (PSPAWNINFO)pSpawnList;
 	float fDist = 0.0f;
 	uiSkipPulse = 0;
 
-	while (pAllSpawns)
-	{
+	while (pAllSpawns) {
 		fDist = GetDistance((PSPAWNINFO)pLocalPlayer, pAllSpawns);
-		if (fDist < AS_Config.ResizeRange)
-		{
+		if (fDist < AS_Config.ResizeRange) {
 			SizePasser(pAllSpawns, false);
 		}
-		else if (fDist < AS_Config.ResizeRange + 50)
-		{
+		else if (fDist < AS_Config.ResizeRange + 50) {
 			SizePasser(pAllSpawns, true);
 		}
 		pAllSpawns = pAllSpawns->pNext;
 	}
 }
 
-void OutputHelp()
-{
+void OutputHelp() {
 	WriteChatf("\ay%s\aw:: Command Usage Help", MODULE_NAME);
 	WriteChatf("  \ag/autosize\ax - Toggles zone-wide AutoSize on/off");
 	WriteChatf("  \ag/autosize\ax \aydist\ax - Toggles distance-based AutoSize on/off");
@@ -550,24 +503,10 @@ void OutputHelp()
 	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
 }
 
-void OutputStatus()
-{
+void OutputStatus() {
 	char szMethod[100] = { 0 };
 	char szOn[10] = "\agon\ax";
 	char szOff[10] = "\aroff\ax";
-	// TODO: maybe remove later, for now commented out Zonewide
-	// if (AS_Config.OptByZone)
-	//{
-	//	sprintf_s(szMethod, "\ayZonewide\ax");
-	//}
-	//else if (AS_Config.OptByRange)
-	//{
-	//	sprintf_s(szMethod, "\ayRange\ax) RangeSize(\ag%d\ax", AS_Config.ResizeRange);
-	//}
-	//else
-	//{
-	//	sprintf_s(szMethod, "\arInactive\ax");
-	//}
 
 	// replaced above with a more direct feedback
 	if (!AS_Config.OptPC && !AS_Config.OptNPC && !AS_Config.OptPet && !AS_Config.OptMerc && !AS_Config.OptCorpse && !AS_Config.OptSelf) {
@@ -584,38 +523,36 @@ void OutputStatus()
 	WriteChatf("\ay%s\aw:: Current Status -- Method: (%s)%s", MODULE_NAME, szMethod, AS_Config.OptAutoSave ? " \agAUTOSAVING" : "");
 	// leaving Everything in the output to avoid any script which might have read this line
 	// forced the value to off though.
-	WriteChatf("Toggles: PC(%s) NPC(%s) Pets(%s) Mercs(%s) Mounts(%s) Corpses(%s) Self(%s) Everything(%s) ", 
-		AS_Config.OptPC ? szOn : szOff, 
-		AS_Config.OptNPC ? szOn : szOff, 
-		AS_Config.OptPet ? szOn : szOff, 
-		AS_Config.OptMerc ? szOn : szOff, 
-		AS_Config.OptMount ? szOn : szOff, 
-		AS_Config.OptCorpse ? szOn : szOff, 
-		AS_Config.OptSelf ? szOn : szOff, 
+	WriteChatf("Toggles: PC(%s) NPC(%s) Pets(%s) Mercs(%s) Mounts(%s) Corpses(%s) Self(%s) Everything(%s) ",
+		AS_Config.OptPC ? szOn : szOff,
+		AS_Config.OptNPC ? szOn : szOff,
+		AS_Config.OptPet ? szOn : szOff,
+		AS_Config.OptMerc ? szOn : szOff,
+		AS_Config.OptMount ? szOn : szOff,
+		AS_Config.OptCorpse ? szOn : szOff,
+		AS_Config.OptSelf ? szOn : szOff,
 		//AS_Config.OptEverything ? szOn : szOff
 		szOff);
-	WriteChatf("Sizes: PC(\ag%d\ax) NPC(\ag%d\ax) Pets(\ag%d\ax) Mercs(\ag%d\ax) Mounts(\ag%d\ax) Corpses(\ag%d\ax) Target(\ag%d\ax) Self(\ag%d\ax) Everything(\ag%d\ax)", 
-		AS_Config.SizePC, 
-		AS_Config.SizeNPC, 
-		AS_Config.SizePet, 
-		AS_Config.SizeMerc, 
-		AS_Config.SizeMount, 
-		AS_Config.SizeCorpse, 
-		AS_Config.SizeTarget, 
-		AS_Config.SizeSelf, 
+	WriteChatf("Sizes: PC(\ag%d\ax) NPC(\ag%d\ax) Pets(\ag%d\ax) Mercs(\ag%d\ax) Mounts(\ag%d\ax) Corpses(\ag%d\ax) Target(\ag%d\ax) Self(\ag%d\ax) Everything(\ag%d\ax)",
+		AS_Config.SizePC,
+		AS_Config.SizeNPC,
+		AS_Config.SizePet,
+		AS_Config.SizeMerc,
+		AS_Config.SizeMount,
+		AS_Config.SizeCorpse,
+		AS_Config.SizeTarget,
+		AS_Config.SizeSelf,
 		AS_Config.SizeDefault);
 }
 
-bool ToggleOption(const char* pszToggleOutput, bool* pbOption)
-{
+bool ToggleOption(const char* pszToggleOutput, bool* pbOption) {
 	*pbOption = !*pbOption;
 	WriteChatf("\ay%s\aw:: Option (\ay%s\ax) now %s\ax", MODULE_NAME, pszToggleOutput, *pbOption ? "\agenabled" : "\ardisabled");
 	if (AS_Config.OptAutoSave) SaveINI();
 	return *pbOption;
 }
 
-void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize)
-{
+void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize) {
 	// special handling for Range being set to Zonewide
 	if (ci_equals(pszOption, "range") && iNewSize == FAR_CLIP_PLANE) {
 		// set the pointer to the new value
@@ -626,42 +563,26 @@ void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize)
 	}
 
 	// make sure that we are setting values for a valid reason
-	if ((iNewSize != *iOldSize) && (iNewSize >= MIN_SIZE && iNewSize <= MAX_SIZE))
-	{
+	if ((iNewSize != *iOldSize) && (iNewSize >= MIN_SIZE && iNewSize <= MAX_SIZE)) {
 		int iPrevSize = *iOldSize;
 		// set the pointer to the new value
 		*iOldSize = iNewSize;
 		WriteChatf("\ay%s\aw:: %s size changed from \ay%d\ax to \ag%d", MODULE_NAME, pszOption, iPrevSize, *iOldSize);
 	}
-	else
-	{
+	else {
 		WriteChatf("\ay%s\aw:: %s size is \ag%d\ax (was not modified)", MODULE_NAME, pszOption, *iOldSize);
 	}
 	if (AS_Config.OptAutoSave) SaveINI();
 }
 
-// TODO: maybe remove later, for now commented out Zonewide
-// void SetEnabled(bool bEnable) {
-//	AS_Config.OptByZone = bEnable;
-//	SpawnListResize(!bEnable);
-//	WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now %s\ax!", MODULE_NAME, AS_Config.OptByZone ? "\agenabled" : "\ardisabled");
-//	if (AS_Config.OptAutoSave)
-//		SaveINI();
-//}
-
-void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
-{
+void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 	char szCurArg[MAX_STRING] = { 0 };
 	char szNumber[MAX_STRING] = { 0 };
 	GetArg(szCurArg, szLine, 1);
 	GetArg(szNumber, szLine, 2);
 	int iNewSize = std::atoi(szNumber);
 
-	if (!*szCurArg)
-	{
-		// TODO: maybe remove later, for now commented out Zonewide
-		// SetEnabled(!AS_Config.OptByZone);
-		
+	if (!*szCurArg)	{
 		// fake Zonewide with large value which is effectively Far Cliping Plane at 100%
 		if (AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange < FAR_CLIP_PLANE) {
 			// this means we are currently using Range distance normally
@@ -678,100 +599,71 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 		}
 		return;
 	}
-	else if (ci_equals(szCurArg, "dist"))
-	{
-		// TODO: maybe remove later, for now commented out Zonewide
-		// if (AS_Config.OptByRange)
-		//{
-		//	if (AS_Config.OptByZone)
-		//	{
-		//		ToggleOption("Zonewide", &AS_Config.OptByZone);
-		//	}
-		//}
-		//else
-		//{
-		//	SpawnListResize(true);
-		//}
-		//ToggleOption("Range", &AS_Config.OptByRange);
-
-		// TODO: write a new thing to act like range is toggling
+	else if (ci_equals(szCurArg, "dist")) {
+		if (AS_Config.ResizeRange == 1000) {
+			emulate("range");
+		}
+		else {
+			emulate("zonewide");
+		}
 		return;
 	}
-	else if (ci_equals(szCurArg, "save"))
-	{
+	else if (ci_equals(szCurArg, "save")) {
 		SaveINI();
 		return;
 	}
-	else if (ci_equals(szCurArg, "load"))
-	{
+	else if (ci_equals(szCurArg, "load")) {
 		LoadINI();
 		return;
 	}
-	else if (ci_equals(szCurArg, "autosave"))
-	{
+	else if (ci_equals(szCurArg, "autosave")) {
 		ToggleOption("Autosave", &AS_Config.OptAutoSave);
 		return;
 	}
-	else if (ci_equals(szCurArg, "range"))
-	{
+	else if (ci_equals(szCurArg, "range")) {
 		SetSizeConfig("range", iNewSize, &AS_Config.ResizeRange);
 		return;
 	}
-	else if (ci_equals(szCurArg, "size"))
-	{
-		SetSizeConfig("Default", iNewSize, &AS_Config.SizeDefault);
+	else if (ci_equals(szCurArg, "size")) {
+		// deprecated because having a default size to be applied to things which are not opt'd to be resized makes no sense.
+		//SetSizeConfig("Default", iNewSize, &AS_Config.SizeDefault);
+		WriteChatf("\ay%s\aw:: This feature (\ay%s\ax) has been deprecated. Check /mqsetting -> plugins -> AutoSize.", MODULE_NAME, szCurArg);
 	}
-	else if (ci_equals(szCurArg, "sizepc"))
-	{
+	else if (ci_equals(szCurArg, "sizepc")) {
 		SetSizeConfig("PC", iNewSize, &AS_Config.SizePC);
 	}
-	else if (ci_equals(szCurArg, "sizenpc"))
-	{
+	else if (ci_equals(szCurArg, "sizenpc")) {
 		SetSizeConfig("NPC", iNewSize, &AS_Config.SizeNPC);
 	}
-	else if (ci_equals(szCurArg, "sizepets"))
-	{
+	else if (ci_equals(szCurArg, "sizepets")) {
 		SetSizeConfig("Pet", iNewSize, &AS_Config.SizePet);
 	}
-	else if (ci_equals(szCurArg, "sizemercs"))
-	{
+	else if (ci_equals(szCurArg, "sizemercs")) {
 		SetSizeConfig("Mercs", iNewSize, &AS_Config.SizeMerc);
 	}
-	else if (ci_equals(szCurArg, "sizetarget"))
-	{
+	else if (ci_equals(szCurArg, "sizetarget")) {
 		SetSizeConfig("Target", iNewSize, &AS_Config.SizeTarget);
 	}
-	else if (ci_equals(szCurArg, "sizemounts"))
-	{
+	else if (ci_equals(szCurArg, "sizemounts")) {
 		SetSizeConfig("Mounts", iNewSize, &AS_Config.SizeMount);
 	}
-	else if (ci_equals(szCurArg, "sizecorpse"))
-	{
+	else if (ci_equals(szCurArg, "sizecorpse")) {
 		SetSizeConfig("Corpses", iNewSize, &AS_Config.SizeCorpse);
 	}
-	else if (ci_equals(szCurArg, "sizeself"))
-	{
+	else if (ci_equals(szCurArg, "sizeself")) {
 		SetSizeConfig("Self", iNewSize, &AS_Config.SizeSelf);
 	}
-	else if (ci_equals(szCurArg, "pc"))
-	{
+	else if (ci_equals(szCurArg, "pc")) {
 		if (!ToggleOption("PC", &AS_Config.OptPC)) {
 			ResetAllByType(PC);
 		}
 	}
-	else if (ci_equals(szCurArg, "npc"))
-	{
+	else if (ci_equals(szCurArg, "npc")) {
 		if (!ToggleOption("NPC", &AS_Config.OptNPC)) {
 			ResetAllByType(NPC);
 		}
 	}
-	else if (ci_equals(szCurArg, "everything"))
-	{
-		// this implementation doesn't work as-is
-		//if (!ToggleOption("Everything", &AS_Config.OptEverything)) {
-		//	SpawnListResize(true);
-		//}
-
+	else if (ci_equals(szCurArg, "everything")) {
 		// a different approach for a better user experience
 		if (!AS_Config.OptSelf) {
 			DoCommandf("/squelch /autosize self");
@@ -795,50 +687,32 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 			DoCommandf("/squelch /autosize pets");
 		}		
 	}
-	else if (ci_equals(szCurArg, "pets"))
-	{
+	else if (ci_equals(szCurArg, "pets")) {
 		if (!ToggleOption("Pets", &AS_Config.OptPet)) {
 			ResetAllByType(PET);
 		}
 	}
-	else if (ci_equals(szCurArg, "mercs"))
-	{
+	else if (ci_equals(szCurArg, "mercs")) {
 		if (!ToggleOption("Mercs", &AS_Config.OptMerc)) {
 			ResetAllByType(MERCENARY);
 		}
 	}
-	else if (ci_equals(szCurArg, "mounts"))
-	{
+	else if (ci_equals(szCurArg, "mounts")) {
 		if (!ToggleOption("Mounts", &AS_Config.OptMount)) {
 			ResetAllByType(MOUNT);
 		}
 	}
-	else if (ci_equals(szCurArg, "corpse"))
-	{
+	else if (ci_equals(szCurArg, "corpse")) {
 		if (!ToggleOption("Corpses", &AS_Config.OptCorpse)) {
 			ResetAllByType(CORPSE);
 		}
 	}
-	else if (ci_equals(szCurArg, "target"))
-	{
-		PSPAWNINFO pTheTarget = (PSPAWNINFO)pTarget;
-		if (pTheTarget && GetGameState() == GAMESTATE_INGAME && pTheTarget->SpawnID)
-		{
-			ChangeSize(pTheTarget, static_cast<float>(AS_Config.SizeTarget));
-			char szTarName[MAX_STRING] = { 0 };
-			sprintf_s(szTarName, "%s", pTheTarget->DisplayedName);
-			WriteChatf("\ay%s\aw:: Resized \ay%s\ax to \ag%d\ax", MODULE_NAME, szTarName, AS_Config.SizeTarget);
-		}
-		else
-		{
-			WriteChatf("\ay%s\aw:: \arYou must have a target to use this parameter.", MODULE_NAME);
-		}
-		return;
+	else if (ci_equals(szCurArg, "target")) {
+		// deprecated because when you use this while having features enabled this feature didn't actually work
+		WriteChatf("\ay%s\aw:: This feature (\ay%s\ax) has been deprecated. Check /mqsetting -> plugins -> AutoSize.", MODULE_NAME, szCurArg);
 	}
-	else if (ci_equals(szCurArg, "self"))
-	{
-		if (!ToggleOption("Self", &AS_Config.OptSelf))
-		{
+	else if (ci_equals(szCurArg, "self")) {
+		if (!ToggleOption("Self", &AS_Config.OptSelf)) {
 			if (((PSPAWNINFO)pLocalPlayer)->Mount) {
 				ChangeSize((PSPAWNINFO)pLocalPlayer, ZERO_SIZE);
 			}
@@ -847,45 +721,27 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 			}
 		}
 	}
-	else if (ci_equals(szCurArg, "help"))
-	{
+	else if (ci_equals(szCurArg, "help")) {
 		OutputHelp();
 		return;
 	}
-	else if (ci_equals(szCurArg, "status"))
-	{
+	else if (ci_equals(szCurArg, "status")) {
 		OutputStatus();
 		return;
 	}
-	else if (ci_equals(szCurArg, "on"))
-	{
-		// TODO: maybe remove later, for now commented out Zonewide
-		// SetEnabled(true);
-
-		// TODO create something to look like zonewide is enabled
+	else if (ci_equals(szCurArg, "on")) {
+		emulate("zonewide");
 	}
-	else if (ci_equals(szCurArg, "off"))
-	{
-		// TODO: maybe remove later, for now commented out Zonewide
-		// SetEnabled(false);
-
-		// TODO create something to look like zonewide is disabled
+	else if (ci_equals(szCurArg, "off")) {
+		emulate("range");
 	}
-	else
-	{
+	else {
 		WriteChatf("\ay%s\aw:: \arInvalid command parameter.", MODULE_NAME);
 		return;
 	}
-
-	// if size change or everything, pets, mercs,mounts toggled and won't be handled onpulse
-	// TODO: maybe remove later, for now commented out Zonewide
-	// if (AS_Config.OptByZone) {
-	//	SpawnListResize(false);
-	//}
 }
 
-PLUGIN_API void InitializePlugin()
-{
+PLUGIN_API void InitializePlugin() {
 	EzDetour(PlayerZoneClient__ChangeHeight, &PlayerZoneClient_Hook::ChangeHeight_Detour, &PlayerZoneClient_Hook::ChangeHeight_Trampoline);
 	pAutoSizeType = new MQ2AutoSizeType;
 	AddMQ2Data("AutoSize", dataAutoSize);
@@ -894,8 +750,7 @@ PLUGIN_API void InitializePlugin()
 	LoadINI();
 }
 
-PLUGIN_API void ShutdownPlugin()
-{
+PLUGIN_API void ShutdownPlugin() {
 	RemoveDetour(PlayerZoneClient__ChangeHeight);
 	RemoveSettingsPanel("plugins/AutoSize");
 	RemoveCommand("/autosize");
@@ -905,37 +760,29 @@ PLUGIN_API void ShutdownPlugin()
 	delete pAutoSizeType;
 }
 
-void DrawAutoSize_MQSettingsPanel()
-{
+void DrawAutoSize_MQSettingsPanel() {
 	ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "MQ2AutoSize");
 	ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
-	if (ImGui::BeginTabBar("AutoSizeTabBar", tab_bar_flags))
-	{
+	if (ImGui::BeginTabBar("AutoSizeTabBar", tab_bar_flags)) {
 				
-		if (ImGui::BeginTabItem("Options"))
-		{
+		if (ImGui::BeginTabItem("Options")) {
 			ImGui::SeparatorText("General");
 
 			if (ImGui::Checkbox("Enable auto saving of configuration", &AS_Config.OptAutoSave)) {
 				AS_Config.OptAutoSave = !AS_Config.OptAutoSave;
 				DoCommandf("/autosize autosave");
 			}
-			if (ImGui::RadioButton("Zonewide (max clipping plane)", &optZonewide, 0)) {
-				optZonewide = 0; // this is not a boolean, this indicates which radio button to enable
-				previousRangeDistance = AS_Config.ResizeRange;
-				AS_Config.ResizeRange = 1000;
-				AS_Config.OptByRange = true; // TODO: enable by default, comment out any/all zonewide related things
-				SpawnListResize(false);
+			if (ImGui::RadioButton("Zonewide (max clipping plane)", &optZonewide, static_cast<int>(ResizeMode::Zonewide))) {
+				optZonewide = static_cast<int>(ResizeMode::Zonewide);
+				emulate("zonewide");
 			}
 			if (ImGui::BeginTable("OptionsResizeRangeTable", 2, ImGuiTableFlags_RowBg)) {
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 20.0f);
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
 				ImGui::TableNextColumn();
-				if (ImGui::RadioButton("", &optZonewide, 1)) {
-					optZonewide = 1; // this is not a boolean, this indicates which radio button to enable
-					AS_Config.ResizeRange = previousRangeDistance;
-					AS_Config.OptByRange = true;
-					SpawnListResize(false);
+				if (ImGui::RadioButton("", &optZonewide, static_cast<int>(ResizeMode::Range))) {
+					optZonewide = static_cast<int>(ResizeMode::Range);
+					emulate("range");
 				}
 				ImGui::TableNextColumn();
 				ImGui::BeginDisabled(AS_Config.ResizeRange == 1000);
@@ -944,11 +791,10 @@ void DrawAutoSize_MQSettingsPanel()
 				ImGui::EndDisabled();
 				ImGui::EndTable();
 			}
-			ImGui::NewLine();
 			if (ImGui::Button("Display status output")) {
 				DoCommandf("/autosize status");
 			}
-			ImGui::SeparatorText("Toggles");
+			ImGui::SeparatorText("Toggles and Values");
 			if (ImGui::BeginTable("OptionsResizeSelfTable", 2, ImGuiTableFlags_RowBg)) {
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 20.0f);
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
@@ -1033,16 +879,68 @@ void DrawAutoSize_MQSettingsPanel()
 			
 			// display the button if any option is not enabled
 			if (!AS_Config.OptCorpse || !AS_Config.OptMerc || !AS_Config.OptMount || !AS_Config.OptNPC || !AS_Config.OptPC || !AS_Config.OptPet || !AS_Config.OptSelf) {
-				ImGui::NewLine();
 				if (ImGui::Button("Resize Everything")) {
 					DoCommandf("/autosize everything");
 				}
-		}
+			}
+
+			ImGui::NewLine();
+			ImGui::SeparatorText("Synchronize clients");
+			if (ImGui::RadioButton("None", &selectedComms, static_cast<int>(CommunicationMode::None))) {
+				selectedComms = static_cast<int>(CommunicationMode::None);
+				return;
+			}
+			ImGui::BeginDisabled(!loaded_dannet);
+			if (ImGui::RadioButton("MQ2DanNet", &selectedComms, static_cast<int>(CommunicationMode::DanNet))) {
+				selectedComms = static_cast<int>(CommunicationMode::DanNet);
+			}
+			if (!loaded_dannet) {
+				ImGui::SameLine();
+				ImGui::Text("(plugin not loaded)");
+			}
+			ImGui::EndDisabled();
+			
+			ImGui::BeginDisabled(!loaded_eqbc);
+			if (ImGui::RadioButton("MQ2EQBC", &selectedComms, static_cast<int>(CommunicationMode::EQBC))) {
+				selectedComms = static_cast<int>(CommunicationMode::EQBC);
+			}
+			if (!loaded_eqbc) {
+				ImGui::SameLine();
+				ImGui::Text("(plugin not loaded)");
+			}
+			ImGui::EndDisabled();
+
+			// if dannet
+			if (selectedComms == static_cast<int>(CommunicationMode::DanNet) && loaded_dannet) {
+				if (ImGui::Button("All")) {
+					DoCommandf("a");
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Zone")) {
+					DoCommandf("a");
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Raid")) {
+					DoCommandf("a");
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Group")) {
+					DoCommandf("a");
+				}
+			} else if (selectedComms == static_cast<int>(CommunicationMode::EQBC) && loaded_eqbc) {
+				if (ImGui::Button("All")) {
+					DoCommandf("a");
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Group")) {
+					DoCommandf("a");
+				}
+			}
+
 			ImGui::EndTabItem();
 		}
 				
-		if (ImGui::BeginTabItem("Commands"))
-		{
+		if (ImGui::BeginTabItem("Commands")) {
 			ImGui::SeparatorText("Toggles");
 			ImGui::Indent();
 			if (ImGui::BeginTable("AutoSizeTogglesTable", 2, ImGuiTableFlags_RowBg)) {
@@ -1149,13 +1047,10 @@ void DrawAutoSize_MQSettingsPanel()
 		}
 		ImGui::EndTabBar();
 	}
-	ImGui::TreePop();
 }
 
-void DoGroupCommand(std::string who, std::string_view command)
-{
-	if (comms == "None")
-	{
+void DoGroupCommand(std::string who, std::string_view command) {
+	if (selectedComms == static_cast<int>(CommunicationMode::EQBC)) {
 		WriteChatf("MQ2AutoSize: Cannot execute group command, no group plugin configured.");
 		return;
 	}
@@ -1163,8 +1058,7 @@ void DoGroupCommand(std::string who, std::string_view command)
 	std::string groupCommand;
 	groupCommand = "/squelch ";
 
-	if (comms == "DanNet")
-	{
+	if (selectedComms == static_cast<int>(CommunicationMode::DanNet)) {
 		if (who == "zone")
 			groupCommand += fmt::format("/dgza {}", command);
 		else if (who == "raid")
@@ -1174,8 +1068,7 @@ void DoGroupCommand(std::string who, std::string_view command)
 		else if (who == "all")
 			groupCommand += fmt::format("/dgae all {}", command);
 	}
-	else if (comms == "EQBC")
-	{
+	else if (selectedComms == static_cast<int>(CommunicationMode::EQBC)) {
 		if (who == "group")
 			groupCommand += fmt::format("/bcga /{}", command);
 		else if (who == "all")
@@ -1186,15 +1079,86 @@ void DoGroupCommand(std::string who, std::string_view command)
 		DoCommandf(groupCommand.c_str());
 }
 
-// decide which plugin to use for communication
+/**
+ * This function checks the loaded state of the MQ2EQBC and MQ2Dannet plugins
+ * and sets the communication mode accordingly.
+ * 
+ * - If DanNet is loaded, it sets the communication mode to DanNet.
+ * - If EQBC is loaded and DanNet is not loaded, it sets the communication mode to EQBC.
+ * - If neither plugin is loaded, it sets the communication mode to None.
+ *
+ * It also handles transitions between different plugin states to ensure that
+ * the communication mode is updated correctly when the state changes.
+ * 
+ * If both communication plugins are loaded, the default is to use DanNet.
+ */
+// choose the plugin to use for communication
 void ChooseInstructionPlugin() {
-	// use DanNet if it's loaded
-	if (GetPlugin("MQ2Dannet")) {
-		comms = "DanNet";
+	bool prev_loaded_eqbc = loaded_eqbc;
+	bool prev_loaded_dannet = loaded_dannet;
+
+	loaded_eqbc = GetPlugin("MQ2EQBC");
+	loaded_dannet = GetPlugin("MQ2Dannet");
+
+	if (loaded_dannet) {
+		selectedComms = static_cast<int>(CommunicationMode::DanNet);
+	}
+	else if (loaded_eqbc) {
+		selectedComms = static_cast<int>(CommunicationMode::EQBC);
+	}
+	else {
+		selectedComms = static_cast<int>(CommunicationMode::None);
+	}
+
+	// check for changes in loaded plugins
+	if (prev_loaded_dannet && !loaded_dannet && loaded_eqbc) {
+		selectedComms = static_cast<int>(CommunicationMode::EQBC);
+	}
+	else if (prev_loaded_eqbc && !loaded_eqbc && loaded_dannet) {
+		selectedComms = static_cast<int>(CommunicationMode::DanNet);
+	}
+	else if (!prev_loaded_eqbc && !prev_loaded_dannet) {
+		if (loaded_eqbc && !loaded_dannet) {
+			selectedComms = static_cast<int>(CommunicationMode::EQBC);
+		}
+		else if (!loaded_eqbc && loaded_dannet) {
+			selectedComms = static_cast<int>(CommunicationMode::DanNet);
+		}
+		else {
+			selectedComms = static_cast<int>(CommunicationMode::None);
+		}
+	}
+}
+
+/**
+ * This function adjusts the configuration settings based on the provided type.
+ * 
+ * It can emulate a "zonewide" configuration by setting a large range. 
+ * It can also revert to a previous range value for "range" type.
+ *
+ * @param type The type of configuration to emulate. Valid values are "zonewide" and "range".
+ *    - "zonewide": Sets the range to 1000.
+ *    - "range": Sets the range to the previously configured value.
+ */
+// this function is used as a toggle between Zone and Range
+// params: zonewide or range
+void emulate(std::string type) {
+	if (type == "zonewide") {
+		previousRangeDistance = AS_Config.ResizeRange;
+		optZonewide = 0;
+		AS_Config.ResizeRange = 1000;
+		AS_Config.OptByRange = true;
+		WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
+		WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \agenabled\ax!", MODULE_NAME);
+		SpawnListResize(false);
 		return;
 	}
-	// use EQBC if dannet isn't available
-	if (GetPlugin("MQ2EQBC")) {
-		comms = "EQBC";
+	else if (type == "range") {
+		AS_Config.ResizeRange = previousRangeDistance;
+		optZonewide = 1;
+		AS_Config.OptByRange = true;
+		WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \ardisabled\ax!", MODULE_NAME);
+		WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \agenabled\ax!", MODULE_NAME);
+		SpawnListResize(false);
 	}
 }
