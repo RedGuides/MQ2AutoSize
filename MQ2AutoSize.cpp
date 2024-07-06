@@ -80,6 +80,175 @@ public:
 };
 COurSizes AS_Config;
 
+// exposed TLO variables
+class MQ2AutoSizeType* pAutoSizeType = 0;
+class MQ2AutoSizeType : public MQ2Type
+{
+public:
+	enum AutoSizeMembers
+	{
+		Active,
+		AutoSave,
+		ResizePC,
+		ResizeNPC,
+		ResizePets,
+		ResizeMercs,
+		ResizeAll,
+		ResizeMounts,
+		ResizeCorpse,
+		ResizeSelf,
+		SizeByRange,
+		Range,
+		SizeDefault,
+		SizePC,
+		SizeNPC,
+		SizePets,
+		SizeMercs,
+		SizeTarget,
+		SizeMounts,
+		SizeCorpse,
+		SizeSelf
+	};
+
+	MQ2AutoSizeType() :MQ2Type("AutoSize")
+	{
+		TypeMember(Active);
+		TypeMember(AutoSave);
+		TypeMember(ResizePC);
+		TypeMember(ResizeNPC);
+		TypeMember(ResizePets);
+		TypeMember(ResizeMercs);
+		TypeMember(ResizeAll);
+		TypeMember(ResizeMounts);
+		TypeMember(ResizeCorpse);
+		TypeMember(ResizeSelf);
+		TypeMember(SizeByRange);
+		TypeMember(Range);
+		TypeMember(SizeDefault);
+		TypeMember(SizePC);
+		TypeMember(SizeNPC);
+		TypeMember(SizePets);
+		TypeMember(SizeMercs);
+		TypeMember(SizeTarget);
+		TypeMember(SizeMounts);
+		TypeMember(SizeCorpse);
+		TypeMember(SizeSelf);
+	}
+
+	~MQ2AutoSizeType()
+	{
+	}
+
+	bool GetMember(MQVarPtr VarPtr, const char* Member, char* Index, MQTypeVar& Dest)
+	{
+
+		MQTypeMember* pMember = MQ2AutoSizeType::FindMember(Member);
+		if (!pMember)
+			return false;
+
+		switch ((AutoSizeMembers)pMember->ID)
+		{
+		case Active:
+			Dest.Int = AS_Config.OptPC || AS_Config.OptNPC || AS_Config.OptPet || AS_Config.OptMerc || AS_Config.OptMount || AS_Config.OptCorpse || AS_Config.OptSelf;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case AutoSave:
+			Dest.Int = AS_Config.OptAutoSave;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizePC:
+			Dest.Int = AS_Config.OptPC;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizeNPC:
+			Dest.Int = AS_Config.OptNPC;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizePets:
+			Dest.Int = AS_Config.OptPet;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizeMercs:
+			Dest.Int = AS_Config.OptMerc;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizeAll:
+			Dest.Int = AS_Config.OptEverything;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizeMounts:
+			Dest.Int = AS_Config.OptMount;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizeCorpse:
+			Dest.Int = AS_Config.OptCorpse;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case ResizeSelf:
+			Dest.Int = AS_Config.OptSelf;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case SizeByRange:
+			Dest.Int = AS_Config.OptByRange;
+			Dest.Type = datatypes::pBoolType;
+			return true;
+		case Range:
+			Dest.Int = AS_Config.ResizeRange;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizeDefault:
+			Dest.Int = AS_Config.SizeDefault;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizePC:
+			Dest.Int = AS_Config.SizePC;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizeNPC:
+			Dest.Int = AS_Config.SizeNPC;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizePets:
+			Dest.Int = AS_Config.SizePet;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizeMercs:
+			Dest.Int = AS_Config.SizeMerc;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizeTarget:
+			Dest.Int = AS_Config.SizeTarget;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizeMounts:
+			Dest.Int = AS_Config.SizeMount;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizeCorpse:
+			Dest.Int = AS_Config.SizeCorpse;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		case SizeSelf:
+			Dest.Int = AS_Config.SizeSelf;
+			Dest.Type = datatypes::pIntType;
+			return true;
+		}
+		return false;
+	}
+
+	bool ToString(MQVarPtr VarPtr, char* Destination)
+	{
+		return true;
+	}
+};
+
+bool dataAutoSize(const char* szIndex, MQTypeVar& ret)
+{
+	ret.DWord = 1;
+	ret.Type = pAutoSizeType;
+	return true;
+}
+
 // class to access the ChangeHeight function
 class PlayerZoneClient_Hook
 {
@@ -718,7 +887,8 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine)
 PLUGIN_API void InitializePlugin()
 {
 	EzDetour(PlayerZoneClient__ChangeHeight, &PlayerZoneClient_Hook::ChangeHeight_Detour, &PlayerZoneClient_Hook::ChangeHeight_Trampoline);
-
+	pAutoSizeType = new MQ2AutoSizeType;
+	AddMQ2Data("AutoSize", dataAutoSize);
 	AddCommand("/autosize", AutoSizeCmd);
 	AddSettingsPanel("plugins/AutoSize", DrawAutoSize_MQSettingsPanel);
 	LoadINI();
@@ -731,7 +901,8 @@ PLUGIN_API void ShutdownPlugin()
 	RemoveCommand("/autosize");
 	SpawnListResize(true);
 	SaveINI();
-
+	RemoveMQ2Data("AutoSize");
+	delete pAutoSizeType;
 }
 
 void DrawAutoSize_MQSettingsPanel()
