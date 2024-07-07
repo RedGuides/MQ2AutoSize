@@ -33,7 +33,6 @@ void SpawnListResize(bool bReset);
 // added for MQ Settings imgui panel
 bool group_control_checked = false;
 bool group_control_enabled = false;
-void DoGroupCommand(std::string_view command, bool includeSelf);
 void ChooseInstructionPlugin();
 void emulate(std::string type);
 void DrawAutoSize_MQSettingsPanel();
@@ -1090,34 +1089,82 @@ void SendGroupCommand(std::string who) {
 		return;
 	}
 
-	std::string groupCommand;
-	groupCommand = "/squelch ";
-	std::string_view command;
+	// the groupCommand is used as a single string which is made up of several
+	// concatenated instructions that relate to different options and size
+	// values. When enhancing or modifying be sure to remember to add a space
+	// to the end of the concatenated string if there are further instructions
+	// that will be added
+	std::string groupCommand = "/squelch ";
+	std::string instruction;
 
 	// if auto save is enabled
 	if (AS_Config.OptAutoSave) {
-		command = "/autosize load";
+		instruction += "/autosize load ";
 	}
 	else {
-		// if auto save is not enabled, save locally then load elsewhere
-		command = "/multiline ; /autosize ";
+		// if auto save is not enabled, we have to go through every setting
+		// and create a command which covers both options and size values 
+		// in a single multiline command based on the current settings of
+		// the player instructing the synchronization to happen
+		instruction += "/multiline ; "; // must start with this as there are several instructions
+		// autosave
+		if (AS_Config.OptAutoSave) {
+			instruction = "/autosize autosave on; ";
+		}
+		// zonewide and range
+		if (AS_Config.ResizeRange == 1000) {
+			// this covers the use case of the instructor having "zonewide" enabled
+			instruction = "/autosize on; ";
+		}
+		else if (AS_Config.ResizeRange != 1000) {
+			// this covers the use case of the instructor having "range" enabled
+			instruction = fmt::format("/autosize off; /autosize dist on; /autosize range {}; ", AS_Config.ResizeRange);
+		}
+		// OptPC + SizePC
+		if (AS_Config.OptPC) {
+			instruction = fmt::format("/autosize pc on; /autosize sizepc {}; ", AS_Config.SizePC);
+		}
+		// OptNPC + SizeNPC
+		if (AS_Config.OptNPC) {
+			instruction = fmt::format("/autosize npc on; /autosize sizenpc {}; ", AS_Config.SizeNPC);
+		}
+		// OptPet + SizePet
+		if (AS_Config.OptPet) {
+			instruction = fmt::format("/autosize pets on; /autosize sizepets {}; ", AS_Config.SizePet);
+		}
+		// OptMerc + SizeMerc
+		if (AS_Config.OptMerc) {
+			instruction = fmt::format("/autosize mercs on; /autosize sizemercs {}; ", AS_Config.SizeMerc);
+		}
+		// OptMount + SizeMount
+		if (AS_Config.OptMount) {
+			instruction = fmt::format("/autosize mounts on; /autosize sizemounts {}; ", AS_Config.SizeMount);
+		}
+		// OptCorpse + SizeCorpse
+		if (AS_Config.OptCorpse) {
+			instruction = fmt::format("/autosize corpse on; /autosize sizecorpse {}; ", AS_Config.SizeCorpse);
+		}
+		// OptSelf + SizeSelf
+		if (AS_Config.OptSelf) {
+			instruction = fmt::format("/autosize self on; /autosize sizeself {}; ", AS_Config.SizeSelf);
+		}
 	}
 
 	if (selectedComms == static_cast<int>(CommunicationMode::DanNet)) {
 		if (who == "zone")
-			groupCommand += fmt::format("/dgza {}", command);
+			groupCommand += fmt::format("/dgza {}", instruction);
 		else if (who == "raid")
-			groupCommand += fmt::format("/dgra {}", command);
+			groupCommand += fmt::format("/dgra {}", instruction);
 		else if (who == "group")
-			groupCommand += fmt::format("/dgga {}", command);
+			groupCommand += fmt::format("/dgga {}", instruction);
 		else if (who == "all")
-			groupCommand += fmt::format("/dge {}", command); // everyone but self since we already have it locally
+			groupCommand += fmt::format("/dge {}", instruction); // everyone but self since we already have it locally
 	}
 	else if (selectedComms == static_cast<int>(CommunicationMode::EQBC)) {
 		if (who == "group")
-			groupCommand += fmt::format("/bcga /{}", command);
+			groupCommand += fmt::format("/bcga /{}", instruction);
 		else if (who == "all")
-			groupCommand += fmt::format("/bcaa /{}", command);
+			groupCommand += fmt::format("/bcaa /{}", instruction);
 	}
 
 	if (!groupCommand.empty())
@@ -1189,19 +1236,23 @@ void ChooseInstructionPlugin() {
 // params: zonewide or range
 void emulate(std::string type) {
 	if (type == "zonewide") {
-		previousRangeDistance = AS_Config.ResizeRange;
-		optZonewide = static_cast<int>(ResizeMode::Zonewide);
-		AS_Config.ResizeRange = 1000;
-		WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
-		WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \agenabled\ax!", MODULE_NAME);
-		SpawnListResize(false);
+		if (AS_Config.ResizeRange != 1000) {
+			previousRangeDistance = AS_Config.ResizeRange;
+			optZonewide = static_cast<int>(ResizeMode::Zonewide);
+			AS_Config.ResizeRange = 1000;
+			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
+			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \agenabled\ax!", MODULE_NAME);
+			SpawnListResize(false);
+		}
 		return;
 	}
 	else if (type == "range") {
-		AS_Config.ResizeRange = previousRangeDistance;
-		optZonewide = static_cast<int>(ResizeMode::Range);
-		WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \ardisabled\ax!", MODULE_NAME);
-		WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \agenabled\ax!", MODULE_NAME);
-		SpawnListResize(false);
+		if (AS_Config.ResizeRange == 1000) {
+			AS_Config.ResizeRange = previousRangeDistance;
+			optZonewide = static_cast<int>(ResizeMode::Range);
+			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \ardisabled\ax!", MODULE_NAME);
+			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \agenabled\ax!", MODULE_NAME);
+			SpawnListResize(false);
+		}
 	}
 }
