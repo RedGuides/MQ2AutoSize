@@ -880,7 +880,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::PushItemWidth(50.0f);
 				if (ImGui::SliderInt("Range distance (recommended setting)##inputRD", &AS_Config.ResizeRange, 10, 250, "%d", ImGuiSliderFlags_NoInput|ImGuiSliderFlags_AlwaysClamp)) {
 					AS_Config.ResizeRange = RoundToNearestTen(AS_Config.ResizeRange);
-					SaveINI("ResizeRange", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("ResizeRange", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::EndTable();
@@ -903,7 +905,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::SetNextItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptSelf);
 				if (ImGui::SliderInt("Resize: Self##inputSS", &AS_Config.SizeSelf, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
-					SaveINI("SizeSelf", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("SizeSelf", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
@@ -917,7 +921,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::SetNextItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptPC);
 				if (ImGui::SliderInt("Resize: Other player(s) (incluldes those mounted)##inputOP", &AS_Config.SizePC, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
-					SaveINI("SizePC", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("SizePC", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
@@ -931,7 +937,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptPet);
 				if (ImGui::SliderInt("Resize: Pets##inputPS", &AS_Config.SizePet, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
-					SaveINI("SizePet", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("SizePet", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
@@ -945,7 +953,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptMerc);
 				if (ImGui::SliderInt("Resize: Mercs##inputMercSize", &AS_Config.SizeMerc, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
-					SaveINI("SizeMerc", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("SizeMerc", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
@@ -959,7 +969,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptMount);
 				if (ImGui::SliderInt("Resize: Mounts and the Player(s) on them##inputMountSize", &AS_Config.SizeMount, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
-					SaveINI("SizeMount", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("SizeMount", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
@@ -973,7 +985,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptCorpse);
 				if (ImGui::SliderInt("Resize: Corpse(s)##inputCS", &AS_Config.SizeCorpse, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
-					SaveINI("SizeCorpse", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("SizeCorpse", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
@@ -987,7 +1001,9 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptNPC);
 				if (ImGui::SliderInt("Resize: NPC(s)##inputNS", &AS_Config.SizeNPC, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
-					SaveINI("SizeNPC", true);
+					if (AS_Config.OptAutoSave) {
+						SaveINI("SizeNPC", true);
+					}
 				}
 				ImGui::EndDisabled();
 				ImGui::EndTable();
