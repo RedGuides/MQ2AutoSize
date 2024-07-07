@@ -37,6 +37,7 @@ void DoGroupCommand(std::string_view command, bool includeSelf);
 void ChooseInstructionPlugin();
 void emulate(std::string type);
 void DrawAutoSize_MQSettingsPanel();
+void SendGroupCommand(std::string who);
 int optZonewide = 2; // defaults to selecting Range
 int selectedComms = 0; // defaults to none, OnPulse will query for updates
 int previousRangeDistance = 0;
@@ -585,7 +586,19 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 		return;
 	}
 	else if (ci_equals(szCurArg, "autosave")) {
-		ToggleOption("Autosave", &AS_Config.OptAutoSave);
+		if (ci_equals(szNumber, "on")) {
+			if (!AS_Config.OptAutoSave) {
+				ToggleOption("Autosave", &AS_Config.OptAutoSave);
+			}
+		}
+		else if (ci_equals(szNumber, "off")) {
+			if (AS_Config.OptAutoSave) {
+				ToggleOption("Autosave", &AS_Config.OptAutoSave);
+			}
+		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			ToggleOption("Autosave", &AS_Config.OptAutoSave);
+		}
 		return;
 	}
 	else if (ci_equals(szCurArg, "range")) {
@@ -617,14 +630,34 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 		SetSizeConfig("Self", iNewSize, &AS_Config.SizeSelf);
 	}
 	else if (ci_equals(szCurArg, "pc")) {
-		if (!ToggleOption("PC", &AS_Config.OptPC)) {
+		if (ci_equals(szNumber, "on") && !AS_Config.OptPC) {
+			ToggleOption("PC", &AS_Config.OptPC);
+		}
+		else if (ci_equals(szNumber, "off") && AS_Config.OptPC) {
+			ToggleOption("PC", &AS_Config.OptPC);
 			ResetAllByType(PC);
 		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (!ToggleOption("PC", &AS_Config.OptPC)) {
+				ResetAllByType(PC);
+			}
+		}
+		return;
 	}
 	else if (ci_equals(szCurArg, "npc")) {
-		if (!ToggleOption("NPC", &AS_Config.OptNPC)) {
+		if (ci_equals(szNumber, "on") && !AS_Config.OptNPC) {
+			ToggleOption("NPC", &AS_Config.OptNPC);
+		}
+		else if (ci_equals(szNumber, "off") && AS_Config.OptNPC) {
+			ToggleOption("NPC", &AS_Config.OptNPC);
 			ResetAllByType(NPC);
 		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (!ToggleOption("PC", &AS_Config.OptNPC)) {
+				ResetAllByType(NPC);
+			}
+		}
+		return;
 	}
 	else if (ci_equals(szCurArg, "everything")) {
 		// a different approach for a better user experience
@@ -651,38 +684,84 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 		}		
 	}
 	else if (ci_equals(szCurArg, "pets")) {
-		if (!ToggleOption("Pets", &AS_Config.OptPet)) {
+		if (ci_equals(szNumber, "on") && !AS_Config.OptPet) {
+			ToggleOption("Pets", &AS_Config.OptPet);
+		}
+		else if (ci_equals(szNumber, "off") && AS_Config.OptPet) {
+			ToggleOption("Pets", &AS_Config.OptPet);
 			ResetAllByType(PET);
 		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (!ToggleOption("Pets", &AS_Config.OptPet)) {
+				ResetAllByType(PET);
+			}
+		}
+		return;
 	}
 	else if (ci_equals(szCurArg, "mercs")) {
-		if (!ToggleOption("Mercs", &AS_Config.OptMerc)) {
+		if (ci_equals(szNumber, "on") && !AS_Config.OptMerc) {
+			ToggleOption("Mercs", &AS_Config.OptMerc);
+		}
+		else if (ci_equals(szNumber, "off") && AS_Config.OptMerc) {
+			ToggleOption("Mercs", &AS_Config.OptMerc);
 			ResetAllByType(MERCENARY);
 		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (!ToggleOption("Mercs", &AS_Config.OptMerc)) {
+				ResetAllByType(MERCENARY);
+			}
+		}
+		return;
 	}
 	else if (ci_equals(szCurArg, "mounts")) {
-		if (!ToggleOption("Mounts", &AS_Config.OptMount)) {
+		if (ci_equals(szNumber, "on") && !AS_Config.OptMount) {
+			ToggleOption("Mounts", &AS_Config.OptMount);
+		}
+		else if (ci_equals(szNumber, "off") && AS_Config.OptMount) {
+			ToggleOption("Mounts", &AS_Config.OptMount);
 			ResetAllByType(MOUNT);
 		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (!ToggleOption("Mounts", &AS_Config.OptMount)) {
+				ResetAllByType(MOUNT);
+			}
+		}
+		return;
 	}
 	else if (ci_equals(szCurArg, "corpse")) {
-		if (!ToggleOption("Corpses", &AS_Config.OptCorpse)) {
+		if (ci_equals(szNumber, "on") && !AS_Config.OptCorpse) {
+			ToggleOption("Corpses", &AS_Config.OptCorpse);
+		}
+		else if (ci_equals(szNumber, "off") && AS_Config.OptCorpse) {
+			ToggleOption("Corpses", &AS_Config.OptCorpse);
 			ResetAllByType(CORPSE);
 		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (!ToggleOption("Corpses", &AS_Config.OptCorpse)) {
+				ResetAllByType(CORPSE);
+			}
+		}
+		return;
 	}
 	else if (ci_equals(szCurArg, "target")) {
-		// deprecated because when you use this while having features enabled this feature didn't actually work
+		// deprecated because when you use this while having features enabled this feature didn't actually work.
+		// if you don't have anything resizing, why would you want to resize just the target?
 		WriteChatf("\ay%s\aw:: This feature (\ay%s\ax) has been deprecated. Check /mqsetting -> plugins -> AutoSize.", MODULE_NAME, szCurArg);
 	}
 	else if (ci_equals(szCurArg, "self")) {
-		if (!ToggleOption("Self", &AS_Config.OptSelf)) {
-			if (((PSPAWNINFO)pLocalPlayer)->Mount) {
+		if (ci_equals(szNumber, "on") && !AS_Config.OptSelf) {
+			ToggleOption("Self", &AS_Config.OptSelf);
+		}
+		else if (ci_equals(szNumber, "off") && AS_Config.OptSelf) {
+			ToggleOption("Self", &AS_Config.OptSelf);
+			ChangeSize((PSPAWNINFO)pLocalPlayer, ZERO_SIZE);
+		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (!ToggleOption("Self", &AS_Config.OptSelf)) {
 				ChangeSize((PSPAWNINFO)pLocalPlayer, ZERO_SIZE);
 			}
-			else {
-				ChangeSize((PSPAWNINFO)pCharSpawn, ZERO_SIZE);
-			}
 		}
+		return;
 	}
 	else if (ci_equals(szCurArg, "help")) {
 		OutputHelp();
@@ -847,7 +926,6 @@ void DrawAutoSize_MQSettingsPanel() {
 				}
 			}
 
-			ImGui::NewLine();
 			ImGui::SeparatorText("Synchronize clients");
 			if (ImGui::RadioButton("None", &selectedComms, static_cast<int>(CommunicationMode::None))) {
 				selectedComms = static_cast<int>(CommunicationMode::None);
@@ -876,27 +954,27 @@ void DrawAutoSize_MQSettingsPanel() {
 			// if dannet
 			if (selectedComms == static_cast<int>(CommunicationMode::DanNet) && loaded_dannet) {
 				if (ImGui::Button("All")) {
-					DoCommandf("a");
+					SendGroupCommand("all");
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("Zone")) {
-					DoCommandf("a");
+					SendGroupCommand("zone");
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("Raid")) {
-					DoCommandf("a");
+					SendGroupCommand("raid");
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("Group")) {
-					DoCommandf("a");
+					SendGroupCommand("group");
 				}
 			} else if (selectedComms == static_cast<int>(CommunicationMode::EQBC) && loaded_eqbc) {
 				if (ImGui::Button("All")) {
-					DoCommandf("a");
+					SendGroupCommand("all");
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("Group")) {
-					DoCommandf("a");
+					SendGroupCommand("group");
 				}
 			}
 
@@ -1003,14 +1081,27 @@ void DrawAutoSize_MQSettingsPanel() {
 	}
 }
 
-void DoGroupCommand(std::string who, std::string_view command) {
-	if (selectedComms == static_cast<int>(CommunicationMode::EQBC)) {
+// send instruction to select few
+// -> dannet: all, zone, raid, group
+// -> eqbc: all, group
+void SendGroupCommand(std::string who) {
+	if (selectedComms == static_cast<int>(CommunicationMode::None)) {
 		WriteChatf("MQ2AutoSize: Cannot execute group command, no group plugin configured.");
 		return;
 	}
 
 	std::string groupCommand;
 	groupCommand = "/squelch ";
+	std::string_view command;
+
+	// if auto save is enabled
+	if (AS_Config.OptAutoSave) {
+		command = "/autosize load";
+	}
+	else {
+		// if auto save is not enabled, save locally then load elsewhere
+		command = "/multiline ; /autosize ";
+	}
 
 	if (selectedComms == static_cast<int>(CommunicationMode::DanNet)) {
 		if (who == "zone")
@@ -1020,7 +1111,7 @@ void DoGroupCommand(std::string who, std::string_view command) {
 		else if (who == "group")
 			groupCommand += fmt::format("/dgga {}", command);
 		else if (who == "all")
-			groupCommand += fmt::format("/dgae all {}", command);
+			groupCommand += fmt::format("/dge {}", command); // everyone but self since we already have it locally
 	}
 	else if (selectedComms == static_cast<int>(CommunicationMode::EQBC)) {
 		if (who == "group")
