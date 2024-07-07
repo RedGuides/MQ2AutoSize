@@ -700,7 +700,7 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 			ResetAllByType(NPC);
 		}
 		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
-			if (!ToggleOption("PC", &AS_Config.OptNPC)) {
+			if (!ToggleOption("NPC", &AS_Config.OptNPC)) {
 				ResetAllByType(NPC);
 			}
 		}
@@ -844,7 +844,9 @@ PLUGIN_API void ShutdownPlugin() {
 	RemoveSettingsPanel("plugins/AutoSize");
 	RemoveCommand("/autosize");
 	SpawnListResize(true);
-	SaveINI();
+	if (AS_Config.OptAutoSave) {
+		SaveINI();
+	}
 	RemoveMQ2Data("AutoSize");
 	delete pAutoSizeType;
 }
@@ -1262,7 +1264,8 @@ void SendGroupCommand(std::string who) {
 	}
 
 	if (!groupCommand.empty())
-		DoCommandf(groupCommand.c_str());
+		//DoCommandf(groupCommand.c_str());
+		WriteChatf("DEBUG: command: %s", groupCommand.c_str());
 }
 
 /**
