@@ -37,6 +37,7 @@ void ChooseInstructionPlugin();
 void emulate(std::string type);
 void DrawAutoSize_MQSettingsPanel();
 void SendGroupCommand(std::string who);
+int RoundToNearestTen(int value);
 int optZonewide = 2; // defaults to selecting Range
 int selectedComms = 0; // defaults to none, OnPulse will query for updates
 int previousRangeDistance = 0;
@@ -300,27 +301,56 @@ void LoadINI() {
 	}
 }
 
-void SaveINI() {
-	WritePrivateProfileString("Config", "AutoSave", AS_Config.OptAutoSave ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "ResizePC", AS_Config.OptPC ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "ResizeNPC", AS_Config.OptNPC ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "ResizePets", AS_Config.OptPet ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "ResizeMercs", AS_Config.OptMerc ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "ResizeMounts", AS_Config.OptMount ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "ResizeCorpse", AS_Config.OptCorpse ? "on" : "off", INIFileName);
-	WritePrivateProfileString("Config", "ResizeSelf", AS_Config.OptSelf ? "on" : "off", INIFileName);
-	// this avoids writing FAR_CLIP_PLANE value to INI
-	if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
-		WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
+// you can pass a param for an INI key to only save that single key or
+// you can leave the param null and save everything in the map
+// you can enable squelch which just not print to the client
+void SaveINI(const std::string& param = "", const bool squelch = 0) {
+	// Map to store configuration key-value pairs
+	std::map<std::string, std::string> configMap = {
+		{"AutoSave", AS_Config.OptAutoSave ? "on" : "off"},
+		{"ResizePC", AS_Config.OptPC ? "on" : "off"},
+		{"ResizeNPC", AS_Config.OptNPC ? "on" : "off"},
+		{"ResizePets", AS_Config.OptPet ? "on" : "off"},
+		{"ResizeMercs", AS_Config.OptMerc ? "on" : "off"},
+		{"ResizeMounts", AS_Config.OptMount ? "on" : "off"},
+		{"ResizeCorpse", AS_Config.OptCorpse ? "on" : "off"},
+		{"ResizeSelf", AS_Config.OptSelf ? "on" : "off"},
+		{"SizePC", std::to_string(AS_Config.SizePC)},
+		{"SizeNPC", std::to_string(AS_Config.SizeNPC)},
+		{"SizePets", std::to_string(AS_Config.SizePet)},
+		{"SizeMercs", std::to_string(AS_Config.SizeMerc)},
+		{"SizeMounts", std::to_string(AS_Config.SizeMount)},
+		{"SizeCorpse", std::to_string(AS_Config.SizeCorpse)},
+		{"SizeSelf", std::to_string(AS_Config.SizeSelf)}
+	};
+
+	// this writes a specific key to disk with its value
+	if (!param.empty()) {
+		auto it = configMap.find(param);
+		if (it != configMap.end()) {
+			WritePrivateProfileString("Config", it->first, it->second, INIFileName);
+		}
+		// special handling for Range key, we don't want to write the FAR_CLIP_PLANE to disk
+		else if (param == "ResizeRange" && AS_Config.ResizeRange != FAR_CLIP_PLANE) {
+			WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
+		}
 	}
-	WritePrivateProfileString("Config", "SizePC", std::to_string(AS_Config.SizePC), INIFileName);
-	WritePrivateProfileString("Config", "SizeNPC", std::to_string(AS_Config.SizeNPC), INIFileName);
-	WritePrivateProfileString("Config", "SizePets", std::to_string(AS_Config.SizePet), INIFileName);
-	WritePrivateProfileString("Config", "SizeMercs", std::to_string(AS_Config.SizeMerc), INIFileName);
-	WritePrivateProfileString("Config", "SizeMounts", std::to_string(AS_Config.SizeMount), INIFileName);
-	WritePrivateProfileString("Config", "SizeCorpse", std::to_string(AS_Config.SizeCorpse), INIFileName);
-	WritePrivateProfileString("Config", "SizeSelf", std::to_string(AS_Config.SizeSelf), INIFileName);
-	WriteChatf("\ay%s\aw:: Configuration file saved.", MODULE_NAME);
+	else {
+		// this writes all keys and their values to disk as normal
+		for (const auto& [key, value] : configMap) {
+			WritePrivateProfileString("Config", key, value, INIFileName);
+		}
+		// special handling for Range since it's not part of the map (intentionally)
+		if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
+			WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
+		}
+	}
+
+	// only display info if squelch is false
+	if (!squelch) {
+		WriteChatf("\ay%s\aw:: Configuration file saved.", MODULE_NAME);
+	}
+	
 }
 
 void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize) {
@@ -826,15 +856,17 @@ void DrawAutoSize_MQSettingsPanel() {
 				
 		if (ImGui::BeginTabItem("Options")) {
 			ImGui::SeparatorText("General");
-
+			// General: auto save
 			if (ImGui::Checkbox("Enable auto saving of configuration", &AS_Config.OptAutoSave)) {
 				AS_Config.OptAutoSave = !AS_Config.OptAutoSave;
 				DoCommandf("/autosize autosave");
 			}
+			// General: Zodewide
 			if (ImGui::RadioButton("Zonewide (max clipping plane)", &optZonewide, static_cast<int>(ResizeMode::Zonewide))) {
 				optZonewide = static_cast<int>(ResizeMode::Zonewide);
 				emulate("zonewide");
 			}
+			// General: Range
 			if (ImGui::BeginTable("OptionsResizeRangeTable", 2, ImGuiTableFlags_RowBg)) {
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 20.0f);
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
@@ -846,10 +878,14 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::BeginDisabled(AS_Config.ResizeRange == FAR_CLIP_PLANE);
 				ImGui::PushItemWidth(50.0f);
-				ImGui::DragInt("Range distance (recommended setting)##inputRD", &AS_Config.ResizeRange, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Range distance (recommended setting)##inputRD", &AS_Config.ResizeRange, 10, 250, "%d", ImGuiSliderFlags_NoInput|ImGuiSliderFlags_AlwaysClamp)) {
+					AS_Config.ResizeRange = RoundToNearestTen(AS_Config.ResizeRange);
+					SaveINI("ResizeRange", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::EndTable();
 			}
+			// General: Status output
 			if (ImGui::Button("Display status output")) {
 				DoCommandf("/autosize status");
 			}
@@ -857,6 +893,7 @@ void DrawAutoSize_MQSettingsPanel() {
 			if (ImGui::BeginTable("OptionsResizeSelfTable", 2, ImGuiTableFlags_RowBg)) {
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 20.0f);
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+				// Option: Self
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptSelf", &AS_Config.OptSelf)) {
 					AS_Config.OptSelf = !AS_Config.OptSelf;
@@ -865,9 +902,12 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::SetNextItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptSelf);
-				ImGui::DragInt("Resize: Self##inputSS", &AS_Config.SizeSelf, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Resize: Self##inputSS", &AS_Config.SizeSelf, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
+					SaveINI("SizeSelf", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
+				// Option: Other PCs
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptPC", &AS_Config.OptPC)) {
 					AS_Config.OptPC = !AS_Config.OptPC;
@@ -876,9 +916,12 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::SetNextItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptPC);
-				ImGui::DragInt("Resize: Other player(s) (incluldes those mounted)##inputOP", &AS_Config.SizePC, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Resize: Other player(s) (incluldes those mounted)##inputOP", &AS_Config.SizePC, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
+					SaveINI("SizePC", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
+				// Option: Pets
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptPet", &AS_Config.OptPet)) {
 					AS_Config.OptPet = !AS_Config.OptPet;
@@ -887,9 +930,12 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptPet);
-				ImGui::DragInt("Resize: Pets##inputPS", &AS_Config.SizePet, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Resize: Pets##inputPS", &AS_Config.SizePet, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
+					SaveINI("SizePet", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
+				// Option: Mercs
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptMerc", &AS_Config.OptMerc)) {
 					AS_Config.OptMerc = !AS_Config.OptMerc;
@@ -898,9 +944,12 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptMerc);
-				ImGui::DragInt("Resize: Mercs##inputMercSize", &AS_Config.SizeMerc, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Resize: Mercs##inputMercSize", &AS_Config.SizeMerc, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
+					SaveINI("SizeMerc", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
+				// Option: Mounts
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptMount", &AS_Config.OptMount)) {
 					AS_Config.OptMount = !AS_Config.OptMount;
@@ -909,9 +958,12 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptMount);
-				ImGui::DragInt("Resize: Mounts and the Player(s) on them##inputMountSize", &AS_Config.SizeMount, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Resize: Mounts and the Player(s) on them##inputMountSize", &AS_Config.SizeMount, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
+					SaveINI("SizeMount", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
+				// Option: Corpses
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptCorpse", &AS_Config.OptCorpse)) {
 					AS_Config.OptCorpse = !AS_Config.OptCorpse;
@@ -920,9 +972,12 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptCorpse);
-				ImGui::DragInt("Resize: Corpse(s)##inputCS", &AS_Config.SizeCorpse, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Resize: Corpse(s)##inputCS", &AS_Config.SizeCorpse, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
+					SaveINI("SizeCorpse", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::TableNextRow();
+				// Option: NPCs
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptNPC", &AS_Config.OptNPC)) {
 					AS_Config.OptNPC = !AS_Config.OptNPC;
@@ -931,14 +986,16 @@ void DrawAutoSize_MQSettingsPanel() {
 				ImGui::TableNextColumn();
 				ImGui::PushItemWidth(50.0f);
 				ImGui::BeginDisabled(!AS_Config.OptNPC);
-				ImGui::DragInt("Resize: NPC(s)##inputNS", &AS_Config.SizeNPC, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
+				if (ImGui::SliderInt("Resize: NPC(s)##inputNS", &AS_Config.SizeNPC, 1, 30, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp)) {
+					SaveINI("SizeNPC", true);
+				}
 				ImGui::EndDisabled();
 				ImGui::EndTable();
 			}
 			
 			// display the button if any option is not enabled
 			if (!AS_Config.OptCorpse || !AS_Config.OptMerc || !AS_Config.OptMount || !AS_Config.OptNPC || !AS_Config.OptPC || !AS_Config.OptPet || !AS_Config.OptSelf) {
-				if (ImGui::Button("Resize Everything")) {
+				if (ImGui::Button("Resize Everything (select all)")) {
 					DoCommandf("/autosize everything");
 				}
 			}
@@ -1275,5 +1332,26 @@ void emulate(std::string type) {
 			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \agenabled\ax!", MODULE_NAME);
 			SpawnListResize(false);
 		}
+	}
+}
+
+int RoundToNearestTen(int value) {
+	// Ensure the value is within the accepted range
+	if (value < 10) {
+		return 10;
+	}
+	else if (value > MAX_SIZE) {
+		return 250;
+	}
+
+	// Calculate the rounded value
+	int roundedValue = (value + 9) / 10 * 10;
+
+	// Ensure the rounded value is within the accepted range
+	if (roundedValue > MAX_SIZE) {
+		return 250;
+	}
+	else {
+		return roundedValue;
 	}
 }
