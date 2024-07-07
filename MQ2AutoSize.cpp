@@ -309,7 +309,7 @@ void SaveINI() {
 	WritePrivateProfileString("Config", "ResizeMounts", AS_Config.OptMount ? "on" : "off", INIFileName);
 	WritePrivateProfileString("Config", "ResizeCorpse", AS_Config.OptCorpse ? "on" : "off", INIFileName);
 	WritePrivateProfileString("Config", "ResizeSelf", AS_Config.OptSelf ? "on" : "off", INIFileName);
-	// this avoids writing 1000 to INI
+	// this avoids writing FAR_CLIP_PLANE value to INI
 	if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 		WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
 	}
@@ -479,11 +479,11 @@ void OutputStatus() {
 	if (!AS_Config.OptPC && !AS_Config.OptNPC && !AS_Config.OptPet && !AS_Config.OptMerc && !AS_Config.OptCorpse && !AS_Config.OptSelf) {
 		sprintf_s(szMethod, "\arInactive\ax");
 	}
-	else if (AS_Config.ResizeRange < 1000) {
+	else if (AS_Config.ResizeRange < FAR_CLIP_PLANE) {
 		sprintf_s(szMethod, "\ayRange\ax) RangeSize(\ag%d\ax", AS_Config.ResizeRange);
 	}
-	else if (AS_Config.ResizeRange == 1000) {
-		// covers the idea of Zonewide by using 1000 units (which is about 100% Far Cliping Plane)
+	else if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
+		// covers the idea of Zonewide by using FAR_CLIP_PLANE value (which is about 100% Far Cliping Plane)
 		sprintf_s(szMethod, "\ayZonewide\ax");
 	}
 	
@@ -525,7 +525,7 @@ void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize) {
 	if (ci_equals(pszOption, "range") && iNewSize == FAR_CLIP_PLANE) {
 		// set the pointer to the new value
 		*iOldSize = iNewSize;
-		WriteChatf("\ay%s\aw:: Range size is \agZonewide\ax - 1000", MODULE_NAME);
+		WriteChatf("\ay%s\aw:: Range size is \agZonewide\ax - %d units", MODULE_NAME, FAR_CLIP_PLANE);
 		// return early to avoid saving to INI
 		return;
 	}
@@ -557,22 +557,40 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 			// now we want look like we are toggling to Zonewide
 			// we will do this by increasing the ResizeRange to FAR_CLIP_PLANE
 			// SetSizeConfig() will mention Zonewide based on FAR_CLIP_PLANE value being used
-			SetSizeConfig("range", FAR_CLIP_PLANE, &AS_Config.ResizeRange);
+			//SetSizeConfig("range", FAR_CLIP_PLANE, &AS_Config.ResizeRange);
+			emulate("zonewide");
 		}
 		else if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
 			// this means we are pretending to be Zonewide and need to revert to Range based
 			// we will do this by reseting the ResizeRange to what is in INI
-			AS_Config.ResizeRange = FAR_CLIP_PLANE;
-			SetSizeConfig("range", 50, &AS_Config.ResizeRange);
+			emulate("range");
+
+			// TODO: DELETE
+			//AS_Config.ResizeRange = FAR_CLIP_PLANE;
+			//if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
+				//SetSizeConfig("range", previousRangeDistance, &AS_Config.ResizeRange);
+			//}
 		}
 		return;
 	}
 	else if (ci_equals(szCurArg, "dist")) {
-		if (AS_Config.ResizeRange == 1000) {
-			emulate("range");
+		if (ci_equals(szNumber, "on")) {
+			if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
+				emulate("range");
+			}
 		}
-		else {
-			emulate("zonewide");
+		else if (ci_equals(szNumber, "off")) {
+			if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
+				emulate("zonewide");
+			}
+		}
+		else if (!ci_equals(szNumber, "on") && !ci_equals(szNumber, "off")) {
+			if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
+				emulate("range");
+			}
+			else if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
+				emulate("zonewide");
+			}
 		}
 		return;
 	}
@@ -826,7 +844,7 @@ void DrawAutoSize_MQSettingsPanel() {
 					emulate("range");
 				}
 				ImGui::TableNextColumn();
-				ImGui::BeginDisabled(AS_Config.ResizeRange == 1000);
+				ImGui::BeginDisabled(AS_Config.ResizeRange == FAR_CLIP_PLANE);
 				ImGui::PushItemWidth(50.0f);
 				ImGui::DragInt("Range distance (recommended setting)##inputRD", &AS_Config.ResizeRange, 1, 1, 250, "%d", ImGuiSliderFlags_AlwaysClamp);
 				ImGui::EndDisabled();
@@ -1112,11 +1130,11 @@ void SendGroupCommand(std::string who) {
 			instruction = "/autosize autosave on; ";
 		}
 		// zonewide and range
-		if (AS_Config.ResizeRange == 1000) {
+		if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
 			// this covers the use case of the instructor having "zonewide" enabled
 			instruction = "/autosize on; ";
 		}
-		else if (AS_Config.ResizeRange != 1000) {
+		else if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 			// this covers the use case of the instructor having "range" enabled
 			instruction = fmt::format("/autosize off; /autosize dist on; /autosize range {}; ", AS_Config.ResizeRange);
 		}
@@ -1229,17 +1247,17 @@ void ChooseInstructionPlugin() {
  * It can also revert to a previous range value for "range" type.
  *
  * @param type The type of configuration to emulate. Valid values are "zonewide" and "range".
- *    - "zonewide": Sets the range to 1000.
+ *    - "zonewide": Sets the range to FAR_CLIP_PLANE value.
  *    - "range": Sets the range to the previously configured value.
  */
 // this function is used as a toggle between Zone and Range
 // params: zonewide or range
 void emulate(std::string type) {
 	if (type == "zonewide") {
-		if (AS_Config.ResizeRange != 1000) {
+		if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 			previousRangeDistance = AS_Config.ResizeRange;
 			optZonewide = static_cast<int>(ResizeMode::Zonewide);
-			AS_Config.ResizeRange = 1000;
+			AS_Config.ResizeRange = FAR_CLIP_PLANE;
 			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", MODULE_NAME);
 			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \agenabled\ax!", MODULE_NAME);
 			SpawnListResize(false);
@@ -1247,7 +1265,7 @@ void emulate(std::string type) {
 		return;
 	}
 	else if (type == "range") {
-		if (AS_Config.ResizeRange == 1000) {
+		if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
 			AS_Config.ResizeRange = previousRangeDistance;
 			optZonewide = static_cast<int>(ResizeMode::Range);
 			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \ardisabled\ax!", MODULE_NAME);
