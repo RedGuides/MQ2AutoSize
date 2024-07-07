@@ -944,10 +944,13 @@ void DrawAutoSize_MQSettingsPanel() {
 			}
 
 			ImGui::SeparatorText("Synchronize clients");
+			ImGui::BeginDisabled(loaded_dannet || loaded_eqbc);
 			if (ImGui::RadioButton("None", &selectedComms, static_cast<int>(CommunicationMode::None))) {
 				selectedComms = static_cast<int>(CommunicationMode::None);
 				return;
 			}
+			ImGui::EndDisabled();
+
 			ImGui::BeginDisabled(!loaded_dannet);
 			if (ImGui::RadioButton("MQ2DanNet", &selectedComms, static_cast<int>(CommunicationMode::DanNet))) {
 				selectedComms = static_cast<int>(CommunicationMode::DanNet);
@@ -1170,11 +1173,11 @@ void SendGroupCommand(std::string who) {
 
 	if (selectedComms == static_cast<int>(CommunicationMode::DanNet)) {
 		if (who == "zone")
-			groupCommand += fmt::format("/dgza {}", instruction);
+			groupCommand += fmt::format("/dgze {}", instruction);
 		else if (who == "raid")
-			groupCommand += fmt::format("/dgra {}", instruction);
+			groupCommand += fmt::format("/dgre {}", instruction);
 		else if (who == "group")
-			groupCommand += fmt::format("/dgga {}", instruction);
+			groupCommand += fmt::format("/dgge {}", instruction);
 		else if (who == "all")
 			groupCommand += fmt::format("/dge {}", instruction); // everyone but self since we already have it locally
 	}
