@@ -1204,7 +1204,14 @@ void SendGroupCommand(std::string who) {
 
 	// if auto save is enabled
 	if (AS_Config.OptAutoSave) {
-		instruction = "/autosize load";
+		// check if zonewide is enabled and send instruction
+		if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
+			instruction += "/multiline ; /autosize load; /autosize on";
+		}
+		else {
+			// just send instruction to load configuration
+			instruction = "/autosize load";
+		}
 	}
 	else {
 		// if auto save is not enabled, we have to go through every setting
