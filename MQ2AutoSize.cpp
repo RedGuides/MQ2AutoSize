@@ -530,7 +530,7 @@ void OutputStatus() {
 		AS_Config.OptMount ? szOn : szOff,
 		AS_Config.OptCorpse ? szOn : szOff,
 		AS_Config.OptSelf ? szOn : szOff,
-		szOff // // no longer available but left to ensure that no random script that reads this, breaks.
+		szOff // no longer available but left to ensure that no random script that reads this, breaks.
 	);
 	WriteChatf("Sizes: PC(\ag%d\ax) NPC(\ag%d\ax) Pets(\ag%d\ax) Mercs(\ag%d\ax) Mounts(\ag%d\ax) Corpses(\ag%d\ax) Target(\ag%d\ax) Self(\ag%d\ax) Everything(\ag%d\ax)",
 		AS_Config.SizePC,
