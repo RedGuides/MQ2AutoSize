@@ -596,12 +596,6 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 			// this means we are pretending to be Zonewide and need to revert to Range based
 			// we will do this by reseting the ResizeRange to what is in INI
 			emulate("range");
-
-			// TODO: DELETE
-			//AS_Config.ResizeRange = FAR_CLIP_PLANE;
-			//if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
-				//SetSizeConfig("range", previousRangeDistance, &AS_Config.ResizeRange);
-			//}
 		}
 		return;
 	}
