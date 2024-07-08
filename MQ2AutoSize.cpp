@@ -1195,55 +1195,48 @@ void SendGroupCommand(std::string who) {
 
 	// if auto save is enabled
 	if (AS_Config.OptAutoSave) {
-		instruction += "/autosize load ";
+		instruction = "/autosize load";
 	}
 	else {
 		// if auto save is not enabled, we have to go through every setting
 		// and create a command which covers both options and size values 
 		// in a single multiline command based on the current settings of
 		// the player instructing the synchronization to happen
-		instruction += "/multiline ; "; // must start with this as there are several instructions
+		instruction = "/multiline ; "; // must start with this as there are several instructions
+		
 		// autosave
-		if (AS_Config.OptAutoSave) {
-			instruction = "/autosize autosave on; ";
-		}
+		instruction += fmt::format("/autosize autosave {}; ", AS_Config.OptAutoSave ? "on" : "off");
+		
 		// zonewide and range
 		if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
 			// this covers the use case of the instructor having "zonewide" enabled
-			instruction = "/autosize on; ";
+			instruction += "/autosize on; ";
 		}
 		else if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 			// this covers the use case of the instructor having "range" enabled
-			instruction = fmt::format("/autosize off; /autosize dist on; /autosize range {}; ", AS_Config.ResizeRange);
+			instruction += fmt::format("/autosize off; /autosize range {}; ", AS_Config.ResizeRange);
 		}
+		
 		// OptPC + SizePC
-		if (AS_Config.OptPC) {
-			instruction = fmt::format("/autosize pc on; /autosize sizepc {}; ", AS_Config.SizePC);
-		}
+		instruction += fmt::format("/autosize pc {}; /autosize sizepc {}; ", AS_Config.OptPC ? "on" : "off", AS_Config.SizePC);
+		
 		// OptNPC + SizeNPC
-		if (AS_Config.OptNPC) {
-			instruction = fmt::format("/autosize npc on; /autosize sizenpc {}; ", AS_Config.SizeNPC);
-		}
-		// OptPet + SizePet
-		if (AS_Config.OptPet) {
-			instruction = fmt::format("/autosize pets on; /autosize sizepets {}; ", AS_Config.SizePet);
-		}
-		// OptMerc + SizeMerc
-		if (AS_Config.OptMerc) {
-			instruction = fmt::format("/autosize mercs on; /autosize sizemercs {}; ", AS_Config.SizeMerc);
-		}
-		// OptMount + SizeMount
-		if (AS_Config.OptMount) {
-			instruction = fmt::format("/autosize mounts on; /autosize sizemounts {}; ", AS_Config.SizeMount);
-		}
-		// OptCorpse + SizeCorpse
-		if (AS_Config.OptCorpse) {
-			instruction = fmt::format("/autosize corpse on; /autosize sizecorpse {}; ", AS_Config.SizeCorpse);
-		}
+		instruction += fmt::format("/autosize npc {}; /autosize sizenpc {}; ", AS_Config.OptNPC ? "on" : "off", AS_Config.SizeNPC);
+				
+		// OptPet + SizePets
+		instruction += fmt::format("/autosize pets {}; /autosize sizepets {}; ", AS_Config.OptPet ? "on" : "off", AS_Config.SizePet);
+
+		// OptMerc + SizeMercs
+		instruction += fmt::format("/autosize mercs {}; /autosize sizemercs {}; ", AS_Config.OptMerc ? "on" : "off", AS_Config.SizeMerc);
+		
+		// OptMount + SizeMounts
+		instruction += fmt::format("/autosize mounts {}; /autosize sizemounts {}; ", AS_Config.OptMount ? "on" : "off", AS_Config.SizeMount);
+		
+		// OptCorpse + SizeCorpses
+		instruction += fmt::format("/autosize corpse {}; /autosize sizecorpse {}; ", AS_Config.OptCorpse ? "on" : "off", AS_Config.SizeCorpse);
+		
 		// OptSelf + SizeSelf
-		if (AS_Config.OptSelf) {
-			instruction = fmt::format("/autosize self on; /autosize sizeself {}; ", AS_Config.SizeSelf);
-		}
+		instruction += fmt::format("/autosize self {}; /autosize sizeself {}; ", AS_Config.OptSelf ? "on" : "off", AS_Config.SizeSelf);
 	}
 
 	if (selectedComms == static_cast<int>(CommunicationMode::DanNet)) {
