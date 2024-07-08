@@ -1239,6 +1239,7 @@ void SendGroupCommand(std::string who) {
 		instruction += fmt::format("/autosize self {}; /autosize sizeself {}; ", AS_Config.OptSelf ? "on" : "off", AS_Config.SizeSelf);
 	}
 
+	// instructions are sent to others, since we have the configuration already
 	if (selectedComms == static_cast<int>(CommunicationMode::DanNet)) {
 		if (who == "zone")
 			groupCommand += fmt::format("/dgze {}", instruction);
@@ -1247,13 +1248,13 @@ void SendGroupCommand(std::string who) {
 		else if (who == "group")
 			groupCommand += fmt::format("/dgge {}", instruction);
 		else if (who == "all")
-			groupCommand += fmt::format("/dge {}", instruction); // everyone but self since we already have it locally
+			groupCommand += fmt::format("/dge {}", instruction);
 	}
 	else if (selectedComms == static_cast<int>(CommunicationMode::EQBC)) {
 		if (who == "group")
-			groupCommand += fmt::format("/bcga /{}", instruction);
+			groupCommand += fmt::format("/bcg /{}", instruction);
 		else if (who == "all")
-			groupCommand += fmt::format("/bcaa /{}", instruction);
+			groupCommand += fmt::format("/bca /{}", instruction);
 	}
 
 	if (!groupCommand.empty())
@@ -1348,7 +1349,7 @@ void emulate(std::string type) {
 }
 
 int RoundToNearestTen(int value) {
-	// Ensure the value is within the accepted range
+	// clamp lower value
 	if (value < 10) {
 		return 10;
 	}
@@ -1356,10 +1357,9 @@ int RoundToNearestTen(int value) {
 		return 250;
 	}
 
-	// Calculate the rounded value
 	int roundedValue = (value + 9) / 10 * 10;
 
-	// Ensure the rounded value is within the accepted range
+	// clamp upper value post rounding
 	if (roundedValue > MAX_SIZE) {
 		return 250;
 	}
