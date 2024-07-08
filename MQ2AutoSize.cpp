@@ -1268,7 +1268,6 @@ void SendGroupCommand(std::string who) {
 
 	if (!groupCommand.empty())
 		DoCommandf(groupCommand.c_str());
-		//WriteChatf("DEBUG: command: %s", groupCommand.c_str());
 }
 
 /**
