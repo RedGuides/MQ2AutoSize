@@ -38,6 +38,8 @@ void emulate(std::string type);
 void DrawAutoSize_MQSettingsPanel();
 void SendGroupCommand(std::string who);
 int RoundToNearestTen(int value);
+static bool isInGroup();
+static bool isInRaid();
 int optZonewide = 2; // defaults to selecting Range
 int selectedComms = 0; // defaults to none, OnPulse will query for updates
 int previousRangeDistance = 0;
@@ -1046,7 +1048,7 @@ void DrawAutoSize_MQSettingsPanel() {
 			}
 			ImGui::EndDisabled();
 
-			// if dannet
+			// dannet
 			if (selectedComms == static_cast<int>(CommunicationMode::DanNet) && loaded_dannet) {
 				if (ImGui::Button("All")) {
 					SendGroupCommand("all");
@@ -1056,21 +1058,28 @@ void DrawAutoSize_MQSettingsPanel() {
 					SendGroupCommand("zone");
 				}
 				ImGui::SameLine();
+				ImGui::BeginDisabled(!isInRaid());
 				if (ImGui::Button("Raid")) {
 					SendGroupCommand("raid");
 				}
+				ImGui::EndDisabled();
 				ImGui::SameLine();
+				ImGui::BeginDisabled(!isInGroup());
 				if (ImGui::Button("Group")) {
 					SendGroupCommand("group");
 				}
+				ImGui::EndDisabled();
 			} else if (selectedComms == static_cast<int>(CommunicationMode::EQBC) && loaded_eqbc) {
+				// eqbc
 				if (ImGui::Button("All")) {
 					SendGroupCommand("all");
 				}
 				ImGui::SameLine();
+				ImGui::BeginDisabled(!isInGroup());
 				if (ImGui::Button("Group")) {
 					SendGroupCommand("group");
 				}
+				ImGui::EndDisabled();
 			}
 
 			ImGui::EndTabItem();
@@ -1258,8 +1267,8 @@ void SendGroupCommand(std::string who) {
 	}
 
 	if (!groupCommand.empty())
-		//DoCommandf(groupCommand.c_str());
-		WriteChatf("DEBUG: command: %s", groupCommand.c_str());
+		DoCommandf(groupCommand.c_str());
+		//WriteChatf("DEBUG: command: %s", groupCommand.c_str());
 }
 
 /**
@@ -1366,4 +1375,22 @@ int RoundToNearestTen(int value) {
 	else {
 		return roundedValue;
 	}
+}
+
+static bool isInGroup() {
+	if (pLocalPC) {
+		if (pLocalPC->Group) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool isInRaid() {
+	if (pRaid) {
+		if (pRaid->RaidMemberCount) {
+			return true;
+		}
+	}
+	return false;
 }
