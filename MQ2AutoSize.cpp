@@ -1,4 +1,4 @@
-// MQ2AutoSize.cpp : Resize spawns by distance or whole zone (client only)
+// MQ2AutoSize.cpp : Resize spawns by distance (client only)
 
 #include <mq/Plugin.h>
 
