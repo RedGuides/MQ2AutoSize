@@ -1,51 +1,42 @@
 // MQ2AutoSize.cpp : Resize spawns by distance or whole zone (client only)
-//
-// 06/09/2009: Fixed for changes to the eqgame function
-//				 added corpse option and autosave -pms
-// 02/09/2009: added parameters, merc, npc & everything spawn options,
-//				 bug fixes and code cleanup - pms
-// 06/28/2008: finds its own offset - ieatacid
-//
-// version 0.9.3 (by Psycotic)
-// v1.0 - Eqmule 07-22-2016 - Added string safety.
-// v1.1 - hytiek 07-01-2024 - Fixed the experience, added MQ Settings ImGui panel
 
 #include <mq/Plugin.h>
 
+// Constants
 const char* MODULE_NAME = "MQ2AutoSize";
+const int SKIP_PULSES = 5;               // Controls the number of pulses to perform a radius-based resize
+const int MIN_SIZE = 1;                  // Minimum size value
+const int MAX_SIZE = 250;                // Maximum size value
+int FAR_CLIP_PLANE = 1000;               // Placeholder for EQ Far Clip Plane value
+const float OTHER_SIZE = 1.0f;           // Default size for other entities
+const float ZERO_SIZE = 0.0f;            // Size representing zero
+const int DEFAULT_COMMS = 0;             // Default comms value
+const int DEFAULT_OPT_ZONEWIDE = 2;      // Default option for zonewide
+
+// Variables
+unsigned int uiSkipPulse = 0;            // Skip pulse counter
+char szTemp[MAX_STRING] = { 0 };         // Temporary buffer for strings
+int previousRangeDistance = 0;           // Previous range distance
+int selectedComms = DEFAULT_COMMS;       // Selected comms, updated in OnPulse
+int optZonewide = DEFAULT_OPT_ZONEWIDE;  // Option for zonewide, defaults to selecting Range
+bool loaded_dannet = false;              // State of DanNet plugin
+bool loaded_eqbc = false;                // State of EQBC plugin
+unsigned long long commsCheck;           // Comms check timestamp
+unsigned long long commsRefreshRateSeconds = 1;	// Refresh rate (seconds) used in OnPulse to check if comms plugins are available
+
+// Function Declarations
+void SpawnListResize(bool bReset);       // Function to resize the spawn list
+void ChooseInstructionPlugin();          // Function to choose the instruction plugin
+void emulate(const std::string& type);   // Function to emulate certain behavior (zonewide vs range)
+void DrawAutoSize_MQSettingsPanel();     // Function to draw the MQ settings panel
+void SendGroupCommand(const std::string& who); // Function to send a command to a group
+int RoundToNearestTen(int value);        // Function to round a value to the nearest ten
+static bool isInGroup();                 // Function to check if in a group
+static bool isInRaid();                  // Function to check if in a raid
+
+// Plugin Setup
 PreSetup(MODULE_NAME);
 PLUGIN_VERSION(1.1);
-// this controls how many pulses to perform a radius-based resize (bad performance hit)
-const int SKIP_PULSES = 5;
-// min and max size values
-const int MIN_SIZE = 1;
-const int MAX_SIZE = 250;
-// maybe later this can link directly to the EQ Far Clip Plane value
-int FAR_CLIP_PLANE = 1000;
-
-// used by the plugin
-const float OTHER_SIZE = 1.0f;
-const float ZERO_SIZE = 0.0f;
-unsigned int uiSkipPulse = 0;
-char szTemp[MAX_STRING] = { 0 };
-void SpawnListResize(bool bReset);
-
-// added for MQ Settings imgui panel
-bool group_control_checked = false;
-bool group_control_enabled = false;
-void ChooseInstructionPlugin();
-void emulate(std::string type);
-void DrawAutoSize_MQSettingsPanel();
-void SendGroupCommand(std::string who);
-int RoundToNearestTen(int value);
-static bool isInGroup();
-static bool isInRaid();
-int optZonewide = 2; // defaults to selecting Range
-int selectedComms = 0; // defaults to none, OnPulse will query for updates
-int previousRangeDistance = 0;
-bool loaded_dannet = false;
-bool loaded_eqbc = false;
-unsigned long long commsCheck;
 
 enum class CommunicationMode {
 	None = 0,
@@ -303,9 +294,8 @@ void LoadINI() {
 	}
 }
 
-// you can pass a param for an INI key to only save that single key or
-// you can leave the param null and save everything in the map
-// you can enable squelch which just not print to the client
+// provide an INI key parameter to save only that key, or leave it null to save all keys
+// enable squelch to suppress output to the client
 void SaveINI(const std::string& param = "", const bool squelch = 0) {
 	// Map to store configuration key-value pairs
 	std::map<std::string, std::string> configMap = {
@@ -352,7 +342,7 @@ void SaveINI(const std::string& param = "", const bool squelch = 0) {
 	if (!squelch) {
 		WriteChatf("\ay%s\aw:: Configuration file saved.", MODULE_NAME);
 	}
-	
+
 }
 
 void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize) {
@@ -431,9 +421,8 @@ void ResetAllByType(eSpawnType OurType) {
 
 		eSpawnType ListType = GetSpawnType(pSpawn);
 		if (ListType == OurType) ChangeSize(pSpawn, ZERO_SIZE);
-		// Handle Everything resize all by using NONE type
-		// it's not a great option but we aren't using NONE 
-		// for anything else so its available for use
+		// use NONE type to handle resizing everything option
+		// NONE is available for this use and works as expected
 		if (OurType == 0) {
 			ChangeSize(pSpawn, ZERO_SIZE);
 		}
@@ -465,14 +454,12 @@ PLUGIN_API void OnPulse() {
 		return;
 	}
 
-	// imgui panel related
 	// check if communication plugins are still running and adjust UI as needed
 	if (GetTickCount64() > commsCheck) {
-		commsCheck = std::int64_t(commsCheck) + 1000; // only check again 1 second from now
+		commsCheck = std::int64_t(commsCheck) + (static_cast<long long>(commsRefreshRateSeconds) * 1000);
 		ChooseInstructionPlugin();
 	}
 	
-
 	PSPAWNINFO pAllSpawns = (PSPAWNINFO)pSpawnList;
 	float fDist = 0.0f;
 	uiSkipPulse = 0;
@@ -500,6 +487,8 @@ void OutputHelp() {
 	WriteChatf("  \ag/autosize\ax [ \aysizepc\ax | \aysizenpc\ax | \aysizepets\ax | \aysizemercs\ax | \aysizemounts\ax | \aysizecorpse\ax | \aysizeself\ax ] [ \ay#\ax ]");
 	WriteChatf("--- Other Valid Commands ---");
 	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
+	WriteChatf("--- Ability to set options ---");
+	WriteChatf("  \ag/autosize\ax [ \ayautosize\ax | \aypc\ax | \aynpc\ax | \aypets\ax | \aymercs\ax | \aymounts\ax | \aycorpse\ax | \ayeverything\ax | \ayself\ax ] [\agon\ax | \aroff\ax]");
 }
 
 void OutputStatus() {
@@ -588,13 +577,12 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 			// this means we are currently using Range distance normally
 			// now we want look like we are toggling to Zonewide
 			// we will do this by increasing the ResizeRange to FAR_CLIP_PLANE
-			// SetSizeConfig() will mention Zonewide based on FAR_CLIP_PLANE value being used
-			//SetSizeConfig("range", FAR_CLIP_PLANE, &AS_Config.ResizeRange);
 			emulate("zonewide");
 		}
 		else if (AS_Config.ResizeRange == FAR_CLIP_PLANE) {
 			// this means we are pretending to be Zonewide and need to revert to Range based
-			// we will do this by reseting the ResizeRange to what is in INI
+			// now we want look like we are toggling to Zonewide
+			// we will do this by reseting the ResizeRange to what it was prior to going zonewide
 			emulate("range");
 		}
 		return;
@@ -703,7 +691,6 @@ void AutoSizeCmd(PSPAWNINFO pLPlayer, char* szLine) {
 		return;
 	}
 	else if (ci_equals(szCurArg, "everything")) {
-		// a different approach for a better user experience
 		if (!AS_Config.OptSelf) {
 			DoCommandf("/squelch /autosize self");
 		}
@@ -1179,20 +1166,20 @@ void DrawAutoSize_MQSettingsPanel() {
 	}
 }
 
-// send instruction to select few
-// -> dannet: all, zone, raid, group
-// -> eqbc: all, group
-void SendGroupCommand(std::string who) {
+// send instruction to selected groups:
+// -> DanNet: all, zone, raid, group
+// -> EQBC: all, group
+void SendGroupCommand(const std::string& who) {
 	if (selectedComms == static_cast<int>(CommunicationMode::None)) {
 		WriteChatf("MQ2AutoSize: Cannot execute group command, no group plugin configured.");
 		return;
 	}
 
-	// the groupCommand is used as a single string which is made up of several
+	// The groupCommand is used as a single string which is made up of several
 	// concatenated instructions that relate to different options and size
 	// values. When enhancing or modifying be sure to remember to add a space
 	// to the end of the concatenated string if there are further instructions
-	// that will be added
+	// that will be added.
 	std::string groupCommand = "/squelch ";
 	std::string instruction;
 
@@ -1334,7 +1321,7 @@ void ChooseInstructionPlugin() {
  */
 // this function is used as a toggle between Zone and Range
 // params: zonewide or range
-void emulate(std::string type) {
+void emulate(const std::string& type) {
 	if (type == "zonewide") {
 		if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
 			previousRangeDistance = AS_Config.ResizeRange;
@@ -1357,6 +1344,9 @@ void emulate(std::string type) {
 	}
 }
 
+// This is used in the imgui panel to jump to the next 10th place to align with
+// the experience of adjusting the EQ Clipping Plane. Each % of clipping plane
+// is about 10 units within game.
 int RoundToNearestTen(int value) {
 	// clamp lower value
 	if (value < 10) {
@@ -1377,6 +1367,7 @@ int RoundToNearestTen(int value) {
 	}
 }
 
+// check if we are in a group
 static bool isInGroup() {
 	if (pLocalPC) {
 		if (pLocalPC->Group) {
@@ -1386,6 +1377,7 @@ static bool isInGroup() {
 	return false;
 }
 
+// check if we are in a raid
 static bool isInRaid() {
 	if (pRaid) {
 		if (pRaid->RaidMemberCount) {
