@@ -322,8 +322,9 @@ void SaveINI(const std::string& param = "", const bool squelch = 0) {
 		if (it != configMap.end()) {
 			WritePrivateProfileString("Config", it->first, it->second, INIFileName);
 		}
-		// special handling for Range key, we don't want to write the FAR_CLIP_PLANE to disk
-		else if (param == "ResizeRange" && AS_Config.ResizeRange != FAR_CLIP_PLANE) {
+		// special handling for Range key, we don't want to write the value to disk unless
+		// it's between MIN_SIZE and MAX_SIZE
+		else if (param == "Range" && AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange <= MAX_SIZE) {
 			WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
 		}
 	}
@@ -333,7 +334,7 @@ void SaveINI(const std::string& param = "", const bool squelch = 0) {
 			WritePrivateProfileString("Config", key, value, INIFileName);
 		}
 		// special handling for Range since it's not part of the map (intentionally)
-		if (AS_Config.ResizeRange != FAR_CLIP_PLANE) {
+		if (AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange <= MAX_SIZE) {
 			WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
 		}
 	}
@@ -866,7 +867,7 @@ void DrawAutoSize_MQSettingsPanel() {
 				if (ImGui::SliderInt("Range distance (recommended setting)##inputRD", &AS_Config.ResizeRange, 10, 250, "%d", ImGuiSliderFlags_NoInput|ImGuiSliderFlags_AlwaysClamp)) {
 					AS_Config.ResizeRange = RoundToNearestTen(AS_Config.ResizeRange);
 					if (AS_Config.OptAutoSave) {
-						SaveINI("ResizeRange", true);
+						SaveINI("Range", true);
 					}
 				}
 				ImGui::EndDisabled();
