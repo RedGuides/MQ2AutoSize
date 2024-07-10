@@ -862,7 +862,7 @@ void DrawAutoSize_MQSettingsPanel() {
 					emulate("range");
 				}
 				ImGui::TableNextColumn();
-				ImGui::BeginDisabled(AS_Config.ResizeRange == FAR_CLIP_PLANE);
+				ImGui::BeginDisabled(optZonewide == static_cast<int>(ResizeMode::Zonewide));
 				ImGui::PushItemWidth(50.0f);
 				if (ImGui::SliderInt("Range distance (recommended setting)##inputRD", &AS_Config.ResizeRange, 10, 250, "%d", ImGuiSliderFlags_NoInput|ImGuiSliderFlags_AlwaysClamp)) {
 					AS_Config.ResizeRange = RoundToNearestTen(AS_Config.ResizeRange);
