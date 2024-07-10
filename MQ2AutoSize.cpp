@@ -343,7 +343,6 @@ void SaveINI(const std::string& param = "", const bool squelch = 0) {
 	if (!squelch) {
 		WriteChatf("\ay%s\aw:: Configuration file saved.", MODULE_NAME);
 	}
-
 }
 
 void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize) {
@@ -1063,7 +1062,6 @@ void DrawAutoSize_MQSettingsPanel() {
 				}
 				ImGui::EndDisabled();
 			}
-
 			ImGui::EndTabItem();
 		}
 				
