@@ -41,7 +41,7 @@ enum class eCommunicationMode
 
 	Default = None
 };
-int selectedComms = static_cast<int>(eCommunicationMode::Default);
+eCommunicationMode selectedComms;
 
 enum class eResizeMode
 {
@@ -1011,6 +1011,13 @@ void handle_plugin_change(std::string_view action, std::string_view pluginRef)
 	commsCheck = GetTickCount64() + 300; // 300ms delay
 }
 
+template <typename T>
+bool RadioButton(const char* label, T* value, T defaultValue)
+{
+	using UnderlyingType = std::underlying_type_t<T>;
+	return ImGui::RadioButton(label, reinterpret_cast<UnderlyingType*>(value), static_cast<UnderlyingType>(defaultValue));
+}
+
 void DrawAutoSize_MQSettingsPanel()
 {
 	ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "MQ2AutoSize");
@@ -1221,7 +1228,7 @@ void DrawAutoSize_MQSettingsPanel()
 			ImGui::SeparatorText("Synchronize clients");
 			ImGui::TextWrapped("This section provides the ability to broadcast your settings to connected peers based on which communication path exists.");
 			ImGui::BeginDisabled(loaded_dannet || loaded_eqbc);
-			ImGui::RadioButton("None", &selectedComms, static_cast<int>(eCommunicationMode::None));
+			RadioButton("None", &selectedComms, eCommunicationMode::None);
 			if (loaded_dannet || loaded_eqbc)
 			{
 				ImGui::SameLine();
@@ -1230,7 +1237,7 @@ void DrawAutoSize_MQSettingsPanel()
 			ImGui::EndDisabled();
 
 			ImGui::BeginDisabled(!loaded_dannet);
-			ImGui::RadioButton("MQ2DanNet", &selectedComms, static_cast<int>(eCommunicationMode::DanNet));
+			RadioButton("MQ2DanNet", &selectedComms, eCommunicationMode::DanNet);
 			if (!loaded_dannet)
 			{
 				ImGui::SameLine();
@@ -1239,7 +1246,7 @@ void DrawAutoSize_MQSettingsPanel()
 			ImGui::EndDisabled();
 
 			ImGui::BeginDisabled(!loaded_eqbc);
-			ImGui::RadioButton("MQ2EQBC", &selectedComms, static_cast<int>(eCommunicationMode::EQBC));
+			RadioButton("MQ2EQBC", &selectedComms, eCommunicationMode::EQBC);
 			if (!loaded_eqbc)
 			{
 				ImGui::SameLine();
@@ -1248,7 +1255,7 @@ void DrawAutoSize_MQSettingsPanel()
 			ImGui::EndDisabled();
 
 			// dannet
-			if (selectedComms == static_cast<int>(eCommunicationMode::DanNet) && loaded_dannet)
+			if (selectedComms == eCommunicationMode::DanNet && loaded_dannet)
 			{
 				if (ImGui::Button("All"))
 				{
@@ -1274,7 +1281,7 @@ void DrawAutoSize_MQSettingsPanel()
 				}
 				ImGui::EndDisabled();
 			}
-			else if (selectedComms == static_cast<int>(eCommunicationMode::EQBC) && loaded_eqbc)
+			else if (selectedComms == eCommunicationMode::EQBC && loaded_eqbc)
 			{
 				// eqbc
 				if (ImGui::Button("All"))
@@ -1402,7 +1409,7 @@ void DrawAutoSize_MQSettingsPanel()
 // -> EQBC: all, group
 void SendGroupCommand(const std::string_view who)
 {
-	if (selectedComms == static_cast<int>(eCommunicationMode::None))
+	if (selectedComms == eCommunicationMode::None)
 	{
 		WriteChatf("MQ2AutoSize: Cannot execute group command, no group plugin configured.");
 		return;
@@ -1476,7 +1483,7 @@ void SendGroupCommand(const std::string_view who)
 	}
 
 	// instructions are sent to others, since we have the configuration already
-	if (selectedComms == static_cast<int>(eCommunicationMode::DanNet))
+	if (selectedComms == eCommunicationMode::DanNet)
 	{
 		if (who == "zone")
 			groupCommand += fmt::format("/dgze {}", instruction);
@@ -1487,7 +1494,7 @@ void SendGroupCommand(const std::string_view who)
 		else if (who == "all")
 			groupCommand += fmt::format("/dge {}", instruction);
 	}
-	else if (selectedComms == static_cast<int>(eCommunicationMode::EQBC))
+	else if (selectedComms == eCommunicationMode::EQBC)
 	{
 		if (who == "group")
 			groupCommand += fmt::format("/bcg /{}", instruction);
@@ -1521,22 +1528,22 @@ void ChooseInstructionPlugin()
 	// prefer DanNet unless EQBC is currently selected
 	if (loaded_eqbc && loaded_dannet)
 	{
-		if (selectedComms != static_cast<int>(eCommunicationMode::EQBC))
+		if (selectedComms != eCommunicationMode::EQBC)
 		{
-			selectedComms = static_cast<int>(eCommunicationMode::DanNet);
+			selectedComms = eCommunicationMode::DanNet;
 		}
 	}
 	else if (loaded_dannet)
 	{
-		selectedComms = static_cast<int>(eCommunicationMode::DanNet);
+		selectedComms = eCommunicationMode::DanNet;
 	}
 	else if (loaded_eqbc)
 	{
-		selectedComms = static_cast<int>(eCommunicationMode::EQBC);
+		selectedComms = eCommunicationMode::EQBC;
 	}
 	else
 	{
-		selectedComms = static_cast<int>(eCommunicationMode::None);
+		selectedComms = eCommunicationMode::None;
 	}
 }
 
