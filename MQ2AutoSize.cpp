@@ -47,11 +47,9 @@ enum class eResizeMode
 {
 	None = 0,
 	Zonewide = 1,
-	Range = 2,
-
-	Default = Range
+	Range = 2
 };
-int ResizeMode = static_cast<int>(eResizeMode::Default);
+eResizeMode ResizeMode = eResizeMode::Range;
 
 // our configuration
 class COurSizes
@@ -1032,9 +1030,9 @@ void DrawAutoSize_MQSettingsPanel()
 				DoCommandf("/autosize autosave %s", AS_Config.OptAutoSave ? "on" : "off");
 			}
 			// General: Zonewide
-			if (ImGui::RadioButton("Zonewide (max clipping plane)", &ResizeMode, static_cast<int>(eResizeMode::Zonewide)))
+			if (RadioButton("Zonewide (max clipping plane)", &ResizeMode, eResizeMode::Zonewide))
 			{
-				ResizeMode = static_cast<int>(eResizeMode::Zonewide);
+				ResizeMode = eResizeMode::Zonewide;
 				emulate("zonewide");
 			}
 			// General: Range
@@ -1043,13 +1041,13 @@ void DrawAutoSize_MQSettingsPanel()
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 20.0f);
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
 				ImGui::TableNextColumn();
-				if (ImGui::RadioButton("##rangeselector", &ResizeMode, static_cast<int>(eResizeMode::Range)))
+				if (RadioButton("##rangeselector", &ResizeMode, eResizeMode::Range))
 				{
-					ResizeMode = static_cast<int>(eResizeMode::Range);
+					ResizeMode = eResizeMode::Range;
 					emulate("range");
 				}
 				ImGui::TableNextColumn();
-				ImGui::BeginDisabled(ResizeMode == static_cast<int>(eResizeMode::Zonewide));
+				ImGui::BeginDisabled(ResizeMode == eResizeMode::Zonewide);
 				ImGui::SetNextItemWidth(50.0f);
 				if (ImGui::SliderInt("Range distance (recommended setting)", &AS_Config.ResizeRange, 10, MAX_SIZE, "%d", ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp))
 				{
@@ -1566,7 +1564,7 @@ void emulate(const std::string_view type)
 		if (AS_Config.ResizeRange != FAR_CLIP_PLANE)
 		{
 			previousRangeDistance = AS_Config.ResizeRange;
-			ResizeMode = static_cast<int>(eResizeMode::Zonewide);
+			ResizeMode = eResizeMode::Zonewide;
 			AS_Config.ResizeRange = FAR_CLIP_PLANE;
 			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \ardisabled\ax!", mqplugin::PluginName);
 			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \agenabled\ax!", mqplugin::PluginName);
@@ -1579,7 +1577,7 @@ void emulate(const std::string_view type)
 		if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 		{
 			AS_Config.ResizeRange = previousRangeDistance;
-			ResizeMode = static_cast<int>(eResizeMode::Range);
+			ResizeMode = eResizeMode::Range;
 			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \ardisabled\ax!", mqplugin::PluginName);
 			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \agenabled\ax!", mqplugin::PluginName);
 			SpawnListResize(false);
