@@ -2,36 +2,37 @@
 
 #include <mq/Plugin.h>
 
-// Constants
-constexpr const int SKIP_PULSES = 5;         // Controls the number of pulses to perform a radius-based resize
-constexpr const int MIN_SIZE = 1;            // Minimum size value
-constexpr const int MAX_SIZE = 250;          // Maximum size value
-constexpr int FAR_CLIP_PLANE = 1000;         // Placeholder for EQ Far Clip Plane value
-constexpr const float OTHER_SIZE = 1.0f;     // Default size for other entities
-constexpr const float ZERO_SIZE = 0.0f;      // Size representing zero
-
-// Variables
-unsigned int uiSkipPulse = 0;                // Skip pulse counter
-char szTemp[MAX_STRING] = { 0 };             // Temporary buffer for strings
-int previousRangeDistance = 0;               // Previous range distance
-bool loaded_dannet = false;                  // State of DanNet plugin
-bool loaded_eqbc = false;                    // State of EQBC plugin
-uint64_t commsCheck = 0;                     // Comms check timestamp
-
-// Function Declarations
-void SpawnListResize(bool bReset);           // Function to resize the spawn list
-void ChooseInstructionPlugin();              // Function to choose the instruction plugin
-void emulate(const std::string_view type);   // Function to emulate certain behavior (zonewide vs range)
-void DrawAutoSize_MQSettingsPanel();         // Function to draw the MQ settings panel
-void SendGroupCommand(const std::string_view who); // Function to send a command to a group
-void handle_plugin_change(std::string_view action, std::string_view pluginRef);   // handles plugin state change
-int RoundToNearestTen(int value);            // Function to round a value to the nearest ten
-static bool isInGroup();                     // Function to check if in a group
-static bool isInRaid();                      // Function to check if in a raid
-
 // Plugin Setup
 PreSetup("MQ2AutoSize");
 PLUGIN_VERSION(1.1);
+
+// Constants
+constexpr int SKIP_PULSES = 5;                      // Controls the number of pulses to perform a radius-based resize
+constexpr int MIN_SIZE = 1;                         // Minimum size value
+constexpr int MAX_SIZE = 250;                       // Maximum size value
+constexpr int FAR_CLIP_PLANE = 1000;                // Placeholder for EQ Far Clip Plane value
+constexpr float OTHER_SIZE = 1.0f;                  // Default size for other entities
+constexpr float ZERO_SIZE = 0.0f;                   // Size representing zero
+
+// Variables
+unsigned int uiSkipPulse = 0;                       // Skip pulse counter
+char szTemp[MAX_STRING] = { 0 };                    // Temporary buffer for strings
+int previousRangeDistance = 0;                      // Previous range distance
+bool loaded_dannet = false;                         // State of DanNet plugin
+bool loaded_eqbc = false;                           // State of EQBC plugin
+uint64_t commsCheck = 0;                            // Comms check timestamp
+
+// Function Declarations
+static void SpawnListResize(bool bReset);           // Function to resize the spawn list
+static void ChooseInstructionPlugin();              // Function to choose the instruction plugin
+static void Emulate(std::string_view type);         // Function to emulate certain behavior (zonewide vs range)
+static void DrawAutoSize_MQSettingsPanel();         // Function to draw the MQ settings panel
+static void SendGroupCommand(std::string_view who); // Function to send a command to a group
+static void HandlePluginChange(std::string_view action, std::string_view pluginRef);   // handles plugin state change
+static int RoundToNearestTen(int value);            // Function to round a value to the nearest ten
+static bool IsInGroup();                            // Function to check if in a group
+static bool IsInRaid();                             // Function to check if in a raid
+
 
 enum class eCommunicationMode
 {
@@ -39,23 +40,23 @@ enum class eCommunicationMode
 	DanNet = 1,
 	EQBC = 2,
 
-	Default = None
+	Default = None,
 };
-eCommunicationMode selectedComms;
+eCommunicationMode selectedComms = eCommunicationMode::Default;
 
 enum class eResizeMode
 {
 	None = 0,
 	Zonewide = 1,
-	Range = 2
+	Range = 2,
+
+	Default = Range,
 };
-eResizeMode ResizeMode = eResizeMode::Range;
+eResizeMode ResizeMode = eResizeMode::Default;
 
 // our configuration
-class COurSizes
+struct COurSizes
 {
-public:
-	COurSizes() = default;
 	bool OptAutoSave = false;
 	bool OptPC = true;
 	bool OptNPC = false;
@@ -121,16 +122,14 @@ public:
 		ScopedTypeMember(AutoSizeMembers, SizeSelf);
 	}
 
-	~MQ2AutoSizeType() {}
-
-	bool GetMember(MQVarPtr VarPtr, const char* Member, char* Index, MQTypeVar& Dest)
+	bool GetMember(MQVarPtr VarPtr, const char* Member, char* Index, MQTypeVar& Dest) override
 	{
 
 		MQTypeMember* pMember = MQ2AutoSizeType::FindMember(Member);
 		if (!pMember)
 			return false;
 
-		switch ((AutoSizeMembers)pMember->ID)
+		switch (static_cast<AutoSizeMembers>(pMember->ID))
 		{
 		case AutoSizeMembers::Active:
 			Dest.Int = AS_Config.OptPC || AS_Config.OptNPC || AS_Config.OptPet || AS_Config.OptMerc || AS_Config.OptMount || AS_Config.OptCorpse || AS_Config.OptSelf;
@@ -203,16 +202,10 @@ public:
 		}
 		return false;
 	}
-
-	bool ToString(MQVarPtr VarPtr, char* Destination)
-	{
-		strcpy_s(Destination, MAX_STRING, "AutoSize");
-		return true;
-	}
 };
-MQ2AutoSizeType* pAutoSizeType = 0;
+MQ2AutoSizeType* pAutoSizeType = nullptr;
 
-bool dataAutoSize(const char* szIndex, MQTypeVar& ret)
+bool dataAutoSize(const char*, MQTypeVar& ret)
 {
 	ret.DWord = 1;
 	ret.Type = pAutoSizeType;
@@ -224,7 +217,7 @@ class PlayerZoneClient_Hook
 {
 public:
 	DETOUR_TRAMPOLINE_DEF(void, ChangeHeight_Trampoline, (float, float, float, bool))
-		void ChangeHeight_Detour(float newHeight, float cameraPos, float speedScale, bool unused)
+	void ChangeHeight_Detour(float newHeight, float cameraPos, float speedScale, bool unused)
 	{
 		ChangeHeight_Trampoline(newHeight, cameraPos, speedScale, unused);
 	}
@@ -241,7 +234,7 @@ public:
 		}
 
 		ChangeHeight_Trampoline(fNewSize, fView, 1.0f, false);
-	};
+	}
 };
 
 /**
@@ -263,14 +256,14 @@ static int getSaneSize(const char* section, const char* key, int defaultValue)
 
 void LoadINI()
 {
-	AS_Config.OptAutoSave = GetPrivateProfileBool("Config", "AutoSave", "on", INIFileName);
-	AS_Config.OptPC = GetPrivateProfileBool("Config", "ResizePC", "off", INIFileName);
-	AS_Config.OptNPC = GetPrivateProfileBool("Config", "ResizeNPC", "off", INIFileName);
-	AS_Config.OptPet = GetPrivateProfileBool("Config", "ResizePets", "off", INIFileName);
-	AS_Config.OptMerc = GetPrivateProfileBool("Config", "ResizeMercs", "off", INIFileName);
-	AS_Config.OptMount = GetPrivateProfileBool("Config", "ResizeMounts", "off", INIFileName);
-	AS_Config.OptCorpse = GetPrivateProfileBool("Config", "ResizeCorpse", "off", INIFileName);
-	AS_Config.OptSelf = GetPrivateProfileBool("Config", "ResizeSelf", "off", INIFileName);
+	AS_Config.OptAutoSave = GetPrivateProfileBool("Config", "AutoSave", true, INIFileName);
+	AS_Config.OptPC = GetPrivateProfileBool("Config", "ResizePC", false, INIFileName);
+	AS_Config.OptNPC = GetPrivateProfileBool("Config", "ResizeNPC", false, INIFileName);
+	AS_Config.OptPet = GetPrivateProfileBool("Config", "ResizePets", false, INIFileName);
+	AS_Config.OptMerc = GetPrivateProfileBool("Config", "ResizeMercs", false, INIFileName);
+	AS_Config.OptMount = GetPrivateProfileBool("Config", "ResizeMounts", false, INIFileName);
+	AS_Config.OptCorpse = GetPrivateProfileBool("Config", "ResizeCorpse", false, INIFileName);
+	AS_Config.OptSelf = GetPrivateProfileBool("Config", "ResizeSelf", false, INIFileName);
 
 	AS_Config.ResizeRange = getSaneSize("Config", "Range", AS_Config.ResizeRange);
 	AS_Config.SizePC = getSaneSize("Config", "SizePC", MIN_SIZE);
@@ -291,7 +284,7 @@ void LoadINI()
 
 // provide an INI key parameter to save only that key, or leave it null to save all keys
 // enable squelch to suppress output to the client
-void SaveINI(const std::string& param = "", const bool squelch = 0)
+void SaveINI(const std::string& param = "", const bool squelch = nullptr)
 {
 	// Map to store configuration key-value pairs
 	std::vector<std::pair<std::string, std::string>> configMap =
@@ -321,11 +314,12 @@ void SaveINI(const std::string& param = "", const bool squelch = 0)
 		{
 			WritePrivateProfileString("Config", it->first, it->second, INIFileName);
 		}
+
 		// special handling for Range key, we don't want to write the value to disk unless
 		// it's between MIN_SIZE and MAX_SIZE
 		else if (param == "Range" && AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange <= MAX_SIZE)
 		{
-			WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
+			WritePrivateProfileInt("Config", "Range", AS_Config.ResizeRange, INIFileName);
 		}
 	}
 	else
@@ -335,10 +329,11 @@ void SaveINI(const std::string& param = "", const bool squelch = 0)
 		{
 			WritePrivateProfileString("Config", key, value, INIFileName);
 		}
+
 		// special handling for Range since it's not part of the map (intentionally)
 		if (AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange <= MAX_SIZE)
 		{
-			WritePrivateProfileString("Config", "Range", std::to_string(AS_Config.ResizeRange), INIFileName);
+			WritePrivateProfileInt("Config", "Range", AS_Config.ResizeRange, INIFileName);
 		}
 	}
 
@@ -368,7 +363,8 @@ void SizePasser(PlayerClient* pSpawn, bool bReset)
 
 	if (pSpawn->SpawnID == pLocalPlayer->SpawnID)
 	{
-		if (AS_Config.OptSelf) ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeSelf);
+		if (AS_Config.OptSelf)
+			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeSelf);
 		return;
 	}
 
@@ -433,14 +429,14 @@ void ResetAllByType(eSpawnType OurType)
 	{
 		if (pSpawn->SpawnID == pLocalPlayer->SpawnID)
 		{
-			pSpawn = pSpawn->pNext;
+			pSpawn = pSpawn->GetNext();
 			continue;
 		}
 
 		eSpawnType ListType = GetSpawnType(pSpawn);
 		if (ListType == OurType) ChangeSize(pSpawn, ZERO_SIZE);
 
-		pSpawn = pSpawn->pNext;
+		pSpawn = pSpawn->GetNext();
 	}
 }
 
@@ -451,7 +447,7 @@ void SpawnListResize(bool bReset)
 	while (pAllSpawns)
 	{
 		SizePasser(pAllSpawns, bReset);
-		pAllSpawns = pAllSpawns->pNext;
+		pAllSpawns = pAllSpawns->GetNext();
 	}
 }
 
@@ -468,12 +464,6 @@ PLUGIN_API void OnPulse()
 		return;
 	}
 
-	if (uiSkipPulse < SKIP_PULSES)
-	{
-		uiSkipPulse++;
-		return;
-	}
-
 	// refresh comms due to OnLoadPlugin or OnUnloadPlugin event
 	if (commsCheck > 0 && GetTickCount64() > commsCheck)
 	{
@@ -482,13 +472,18 @@ PLUGIN_API void OnPulse()
 		ChooseInstructionPlugin();
 	}
 
+	if (uiSkipPulse < SKIP_PULSES)
+	{
+		uiSkipPulse++;
+		return;
+	}
+
 	PlayerClient* pAllSpawns = pSpawnList;
-	float fDist = 0.0f;
 	uiSkipPulse = 0;
 
 	while (pAllSpawns)
 	{
-		fDist = GetDistance(pLocalPlayer, pAllSpawns);
+		float fDist = GetDistance(pLocalPlayer, pAllSpawns);
 		if (fDist < AS_Config.ResizeRange)
 		{
 			SizePasser(pAllSpawns, false);
@@ -497,7 +492,8 @@ PLUGIN_API void OnPulse()
 		{
 			SizePasser(pAllSpawns, true);
 		}
-		pAllSpawns = pAllSpawns->pNext;
+
+		pAllSpawns = pAllSpawns->GetNext();
 	}
 }
 
@@ -568,7 +564,10 @@ bool ToggleOption(const char* pszToggleOutput, bool* pbOption)
 {
 	*pbOption = !*pbOption;
 	WriteChatf("\ay%s\aw:: Option (\ay%s\ax) now %s\ax", mqplugin::PluginName, pszToggleOutput, *pbOption ? "\agenabled" : "\ardisabled");
-	if (AS_Config.OptAutoSave) SaveINI();
+
+	if (AS_Config.OptAutoSave)
+		SaveINI();
+
 	return *pbOption;
 }
 
@@ -576,8 +575,9 @@ void SetOption(const char* optString, bool* pbOption, bool bValue)
 {
 	*pbOption = bValue;
 	WriteChatf("\ay%s\aw:: Option (\ay%s\ax) now %s\ax", mqplugin::PluginName, optString, *pbOption ? "\agenabled" : "\ardisabled");
-	if (AS_Config.OptAutoSave) SaveINI();
-	return;
+
+	if (AS_Config.OptAutoSave)
+		SaveINI();
 }
 
 void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize)
@@ -604,7 +604,9 @@ void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize)
 	{
 		WriteChatf("\ay%s\aw:: %s size is \ag%d\ax (was not modified)", mqplugin::PluginName, pszOption, *iOldSize);
 	}
-	if (AS_Config.OptAutoSave) SaveINI();
+
+	if (AS_Config.OptAutoSave)
+		SaveINI();
 }
 
 void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
@@ -615,7 +617,7 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 	GetArg(szNumber, szLine, 2);
 	int iNewSize = GetIntFromString(szNumber, MIN_SIZE);
 
-	if (!*szCurArg)
+	if (!szCurArg[0])
 	{
 		// fake Zonewide with large value which is effectively Far Cliping Plane at 100%
 		if (AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange < FAR_CLIP_PLANE)
@@ -623,14 +625,14 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 			// this means we are currently using Range distance normally
 			// now we want look like we are toggling to Zonewide
 			// we will do this by increasing the ResizeRange to FAR_CLIP_PLANE
-			emulate("zonewide");
+			Emulate("zonewide");
 		}
 		else if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 		{
 			// this means we are pretending to be Zonewide and need to revert to Range based
 			// now we want look like we are toggling to Zonewide
 			// we will do this by reseting the ResizeRange to what it was prior to going zonewide
-			emulate("range");
+			Emulate("range");
 		}
 		return;
 	}
@@ -640,25 +642,25 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 		{
 			if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 			{
-				emulate("range");
+				Emulate("range");
 			}
 		}
 		else if (ci_equals(szNumber, "off"))
 		{
 			if (AS_Config.ResizeRange != FAR_CLIP_PLANE)
 			{
-				emulate("zonewide");
+				Emulate("zonewide");
 			}
 		}
 		else
 		{
 			if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 			{
-				emulate("range");
+				Emulate("range");
 			}
 			else if (AS_Config.ResizeRange != FAR_CLIP_PLANE)
 			{
-				emulate("zonewide");
+				Emulate("zonewide");
 			}
 		}
 		return;
@@ -773,31 +775,31 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 	{
 		if (!AS_Config.OptSelf)
 		{
-			EzCommand("/squelch /autosize self on");
+			DoCommand("/squelch /autosize self on");
 		}
 		if (!AS_Config.OptCorpse)
 		{
-			EzCommand("/squelch /autosize corpse on");
+			DoCommand("/squelch /autosize corpse on");
 		}
 		if (!AS_Config.OptMerc)
 		{
-			EzCommand("/squelch /autosize mercs on");
+			DoCommand("/squelch /autosize mercs on");
 		}
 		if (!AS_Config.OptMount)
 		{
-			EzCommand("/squelch /autosize mounts on");
+			DoCommand("/squelch /autosize mounts on");
 		}
 		if (!AS_Config.OptNPC)
 		{
-			EzCommand("/squelch /autosize npc on");
+			DoCommand("/squelch /autosize npc on");
 		}
 		if (!AS_Config.OptPC)
 		{
-			EzCommand("/squelch /autosize pc on");
+			DoCommand("/squelch /autosize pc on");
 		}
 		if (!AS_Config.OptPet)
 		{
-			EzCommand("/squelch /autosize pets on");
+			DoCommand("/squelch /autosize pets on");
 		}
 	}
 	else if (ci_equals(szCurArg, "pets"))
@@ -918,11 +920,11 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 	}
 	else if (ci_equals(szCurArg, "on"))
 	{
-		emulate("zonewide");
+		Emulate("zonewide");
 	}
 	else if (ci_equals(szCurArg, "off"))
 	{
-		emulate("range");
+		Emulate("range");
 	}
 	else
 	{
@@ -961,13 +963,13 @@ PLUGIN_API void OnLoadPlugin(const char* pluginName)
 	// dannet plugin is loading
 	if (ci_equals(pluginName, "MQ2DanNet"))
 	{
-		handle_plugin_change("load", "dannet");
+		HandlePluginChange("load", "dannet");
 	}
 
 	// eqbc plugin is loading
 	if (ci_equals(pluginName, "MQ2EQBC"))
 	{
-		handle_plugin_change("load", "eqbc");
+		HandlePluginChange("load", "eqbc");
 	}
 }
 
@@ -976,19 +978,20 @@ PLUGIN_API void OnUnloadPlugin(const char* pluginName)
 	// dannet plugin is about to unload
 	if (ci_equals(pluginName, "MQ2DanNet"))
 	{
-		handle_plugin_change("unload", "dannet");
+		HandlePluginChange("unload", "dannet");
 	}
 
 	// eqbc plugin is about to unload
 	if (ci_equals(pluginName, "MQ2EQBC"))
 	{
-		handle_plugin_change("unload", "eqbc");
+		HandlePluginChange("unload", "eqbc");
 	}
 }
 
-void handle_plugin_change(std::string_view action, std::string_view pluginRef)
+void HandlePluginChange(std::string_view action, std::string_view pluginRef)
 {
-	if (ci_equals(action, "unload")) {
+	if (ci_equals(action, "unload"))
+	{
 		if (ci_equals(pluginRef, "dannet"))
 		{
 			loaded_dannet = false;
@@ -998,13 +1001,6 @@ void handle_plugin_change(std::string_view action, std::string_view pluginRef)
 			loaded_eqbc = false;
 		}
 	}
-	//else if (ci_equals(action, "load"))
-	//{
-	// // intentionally left commented out
-	// // as of now 7/15/2024 there's no need
-	// // to do anything more than set the
-	// // commsCheck below.
-	//}
 	
 	commsCheck = GetTickCount64() + 300; // 300ms delay
 }
@@ -1033,7 +1029,7 @@ void DrawAutoSize_MQSettingsPanel()
 			if (RadioButton("Zonewide (max clipping plane)", &ResizeMode, eResizeMode::Zonewide))
 			{
 				ResizeMode = eResizeMode::Zonewide;
-				emulate("zonewide");
+				Emulate("zonewide");
 			}
 			// General: Range
 			if (ImGui::BeginTable("OptionsResizeRangeTable", 2, ImGuiTableFlags_RowBg))
@@ -1044,7 +1040,7 @@ void DrawAutoSize_MQSettingsPanel()
 				if (RadioButton("##rangeselector", &ResizeMode, eResizeMode::Range))
 				{
 					ResizeMode = eResizeMode::Range;
-					emulate("range");
+					Emulate("range");
 				}
 				ImGui::TableNextColumn();
 				ImGui::BeginDisabled(ResizeMode == eResizeMode::Zonewide);
@@ -1063,7 +1059,7 @@ void DrawAutoSize_MQSettingsPanel()
 			// General: Status output
 			if (ImGui::Button("Display status output"))
 			{
-				DoCommandf("/autosize status");
+				DoCommand("/autosize status");
 			}
 			ImGui::SeparatorText("Toggles and Values");
 			if (ImGui::BeginTable("OptionsResizeSelfTable", 2, ImGuiTableFlags_RowBg))
@@ -1204,7 +1200,7 @@ void DrawAutoSize_MQSettingsPanel()
 			{
 				if (ImGui::Button("Reload INI"))
 				{
-					DoCommandf("/autosize load");
+					LoadINI();
 				}
 			}
 
@@ -1219,7 +1215,7 @@ void DrawAutoSize_MQSettingsPanel()
 				// this button will enable the options which are disabled
 				if (ImGui::Button("Resize Everything (select all)"))
 				{
-					DoCommandf("/autosize everything");
+					DoCommand("/autosize everything");
 				}
 			}
 
@@ -1265,14 +1261,14 @@ void DrawAutoSize_MQSettingsPanel()
 					SendGroupCommand("zone");
 				}
 				ImGui::SameLine();
-				ImGui::BeginDisabled(!isInRaid());
+				ImGui::BeginDisabled(!IsInRaid());
 				if (ImGui::Button("Raid"))
 				{
 					SendGroupCommand("raid");
 				}
 				ImGui::EndDisabled();
 				ImGui::SameLine();
-				ImGui::BeginDisabled(!isInGroup());
+				ImGui::BeginDisabled(!IsInGroup());
 				if (ImGui::Button("Group"))
 				{
 					SendGroupCommand("group");
@@ -1287,7 +1283,7 @@ void DrawAutoSize_MQSettingsPanel()
 					SendGroupCommand("all");
 				}
 				ImGui::SameLine();
-				ImGui::BeginDisabled(!isInGroup());
+				ImGui::BeginDisabled(!IsInGroup());
 				if (ImGui::Button("Group"))
 				{
 					SendGroupCommand("group");
@@ -1405,7 +1401,7 @@ void DrawAutoSize_MQSettingsPanel()
 // send instruction to selected groups:
 // -> DanNet: all, zone, raid, group
 // -> EQBC: all, group
-void SendGroupCommand(const std::string_view who)
+void SendGroupCommand(std::string_view who)
 {
 	if (selectedComms == eCommunicationMode::None)
 	{
@@ -1501,7 +1497,7 @@ void SendGroupCommand(const std::string_view who)
 	}
 
 	if (!groupCommand.empty())
-		DoCommandf(groupCommand.c_str());
+		DoCommand(groupCommand.c_str());
 }
 
 /**
@@ -1557,7 +1553,7 @@ void ChooseInstructionPlugin()
  */
  // this function is used as a toggle between Zone and Range
  // params: zonewide or range
-void emulate(const std::string_view type)
+void Emulate(std::string_view type)
 {
 	if (type == "zonewide")
 	{
@@ -1570,7 +1566,6 @@ void emulate(const std::string_view type)
 			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \agenabled\ax!", mqplugin::PluginName);
 			SpawnListResize(false);
 		}
-		return;
 	}
 	else if (type == "range")
 	{
@@ -1595,7 +1590,8 @@ int RoundToNearestTen(int value)
 	{
 		return 10;
 	}
-	else if (value > MAX_SIZE)
+
+	if (value > MAX_SIZE)
 	{
 		return MAX_SIZE;
 	}
@@ -1607,20 +1603,18 @@ int RoundToNearestTen(int value)
 	{
 		return MAX_SIZE;
 	}
-	else
-	{
-		return roundedValue;
-	}
+	
+	return roundedValue;
 }
 
 // check if we are in a group
-static bool isInGroup()
+static bool IsInGroup()
 {
 	return pLocalPC && pLocalPC->Group;
 }
 
 // check if we are in a raid
-static bool isInRaid()
+static bool IsInRaid()
 {
 	return pRaid && pRaid->RaidMemberCount;
 }
