@@ -1,13 +1,14 @@
 // MQ2AutoSize.cpp : Resize spawns by distance (client only)
 
 #include <mq/Plugin.h>
+#include <chrono>
 
 // Plugin Setup
 PreSetup("MQ2AutoSize");
 PLUGIN_VERSION(1.1);
 
 // Constants
-constexpr int SKIP_PULSES = 5;                      // Controls the number of pulses to perform a radius-based resize
+constexpr std::chrono::milliseconds UPDATE_INTERVAL{ 200 }; // Controls the update frequency to perform a radius-based resize
 constexpr int MIN_SIZE = 1;                         // Minimum size value
 constexpr int MAX_SIZE = 250;                       // Maximum size value
 constexpr int FAR_CLIP_PLANE = 1000;                // Placeholder for EQ Far Clip Plane value
@@ -15,12 +16,10 @@ constexpr float OTHER_SIZE = 1.0f;                  // Default size for other en
 constexpr float ZERO_SIZE = 0.0f;                   // Size representing zero
 
 // Variables
-unsigned int uiSkipPulse = 0;                       // Skip pulse counter
-char szTemp[MAX_STRING] = { 0 };                    // Temporary buffer for strings
+std::chrono::steady_clock::time_point lastUpdate;   // Skip pulse counter
 int previousRangeDistance = 0;                      // Previous range distance
-bool loaded_dannet = false;                         // State of DanNet plugin
-bool loaded_eqbc = false;                           // State of EQBC plugin
-uint64_t commsCheck = 0;                            // Comms check timestamp
+bool loadedDannet = false;                          // State of DanNet plugin
+bool loadedEQBC = false;                            // State of EQBC plugin
 
 // Function Declarations
 static void SpawnListResize(bool bReset);           // Function to resize the spawn list
@@ -28,7 +27,6 @@ static void ChooseInstructionPlugin();              // Function to choose the in
 static void Emulate(std::string_view type);         // Function to emulate certain behavior (zonewide vs range)
 static void DrawAutoSize_MQSettingsPanel();         // Function to draw the MQ settings panel
 static void SendGroupCommand(std::string_view who); // Function to send a command to a group
-static void HandlePluginChange(std::string_view action, std::string_view pluginRef);   // handles plugin state change
 static int RoundToNearestTen(int value);            // Function to round a value to the nearest ten
 static bool IsInGroup();                            // Function to check if in a group
 static bool IsInRaid();                             // Function to check if in a raid
@@ -374,42 +372,36 @@ void SizePasser(PlayerClient* pSpawn, bool bReset)
 		if (AS_Config.OptPC)
 		{
 			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePC);
-			return;
 		}
 		break;
 	case NPC:
 		if (AS_Config.OptNPC)
 		{
 			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeNPC);
-			return;
 		}
 		break;
 	case PET:
 		if (AS_Config.OptPet)
 		{
 			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePet);
-			return;
 		}
 		break;
 	case MERCENARY:
 		if (AS_Config.OptMerc)
 		{
 			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMerc);
-			return;
 		}
 		break;
 	case MOUNT:
 		if (AS_Config.OptMount && pSpawn->SpawnID != pLocalPlayer->SpawnID)
 		{
 			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMount);
-			return;
 		}
 		break;
 	case CORPSE:
 		if (AS_Config.OptCorpse)
 		{
 			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeCorpse);
-			return;
 		}
 		break;
 	default:
@@ -427,22 +419,21 @@ void ResetAllByType(eSpawnType OurType)
 
 	while (pSpawn)
 	{
-		if (pSpawn->SpawnID == pLocalPlayer->SpawnID)
+		if (pSpawn->SpawnID != pLocalPlayer->SpawnID)
 		{
-			pSpawn = pSpawn->GetNext();
-			continue;
+			eSpawnType ListType = GetSpawnType(pSpawn);
+			if (ListType == OurType)
+				ChangeSize(pSpawn, ZERO_SIZE);
 		}
-
-		eSpawnType ListType = GetSpawnType(pSpawn);
-		if (ListType == OurType) ChangeSize(pSpawn, ZERO_SIZE);
-
 		pSpawn = pSpawn->GetNext();
 	}
 }
 
 void SpawnListResize(bool bReset)
 {
-	if (GetGameState() != GAMESTATE_INGAME) return;
+	if (GetGameState() != GAMESTATE_INGAME)
+		return;
+
 	PlayerClient* pAllSpawns = pSpawnList;
 	while (pAllSpawns)
 	{
@@ -450,7 +441,6 @@ void SpawnListResize(bool bReset)
 		pAllSpawns = pAllSpawns->GetNext();
 	}
 }
-
 
 PLUGIN_API void OnEndZone()
 {
@@ -464,23 +454,13 @@ PLUGIN_API void OnPulse()
 		return;
 	}
 
-	// refresh comms due to OnLoadPlugin or OnUnloadPlugin event
-	if (commsCheck > 0 && GetTickCount64() > commsCheck)
+	if (std::chrono::steady_clock::now() < lastUpdate + UPDATE_INTERVAL)
 	{
-		// reset commsCheck to avoid cyclic checking here
-		commsCheck = 0;
-		ChooseInstructionPlugin();
-	}
-
-	if (uiSkipPulse < SKIP_PULSES)
-	{
-		uiSkipPulse++;
 		return;
 	}
+	lastUpdate = std::chrono::steady_clock::now();
 
 	PlayerClient* pAllSpawns = pSpawnList;
-	uiSkipPulse = 0;
-
 	while (pAllSpawns)
 	{
 		float fDist = GetDistance(pLocalPlayer, pAllSpawns);
@@ -609,7 +589,7 @@ void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize)
 		SaveINI();
 }
 
-void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
+void AutoSizeCmd(PlayerClient*, const char* szLine)
 {
 	char szCurArg[MAX_STRING] = { 0 };
 	char szNumber[MAX_STRING] = { 0 };
@@ -634,7 +614,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 			// we will do this by reseting the ResizeRange to what it was prior to going zonewide
 			Emulate("range");
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "dist"))
 	{
@@ -663,40 +642,33 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				Emulate("zonewide");
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "save"))
 	{
 		SaveINI();
-		return;
 	}
 	else if (ci_equals(szCurArg, "load"))
 	{
 		LoadINI();
-		return;
 	}
 	else if (ci_equals(szCurArg, "autosave"))
 	{
 		if (ci_equals(szNumber, "on"))
 		{
 			SetOption("Autosave", &AS_Config.OptAutoSave, true);
-
 		}
 		else if (ci_equals(szNumber, "off"))
 		{
 			SetOption("Autosave", &AS_Config.OptAutoSave, false);
-
 		}
 		else
 		{
 			ToggleOption("Autosave", &AS_Config.OptAutoSave);
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "range"))
 	{
 		SetSizeConfig("range", iNewSize, &AS_Config.ResizeRange);
-		return;
 	}
 	else if (ci_equals(szCurArg, "size"))
 	{
@@ -749,7 +721,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				ResetAllByType(PC);
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "npc"))
 	{
@@ -769,7 +740,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				ResetAllByType(NPC);
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "everything"))
 	{
@@ -820,7 +790,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				ResetAllByType(PET);
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "mercs"))
 	{
@@ -840,7 +809,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				ResetAllByType(MERCENARY);
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "mounts"))
 	{
@@ -860,7 +828,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				ResetAllByType(MOUNT);
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "corpse"))
 	{
@@ -880,7 +847,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				ResetAllByType(CORPSE);
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "target"))
 	{
@@ -906,17 +872,14 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 				ChangeSize(pLocalPlayer, ZERO_SIZE);
 			}
 		}
-		return;
 	}
 	else if (ci_equals(szCurArg, "help"))
 	{
 		OutputHelp();
-		return;
 	}
 	else if (ci_equals(szCurArg, "status"))
 	{
 		OutputStatus();
-		return;
 	}
 	else if (ci_equals(szCurArg, "on"))
 	{
@@ -929,7 +892,6 @@ void AutoSizeCmd(PlayerClient* pLPlayer, const char* szLine)
 	else
 	{
 		WriteChatf("\ay%s\aw:: \arInvalid command parameter.", mqplugin::PluginName);
-		return;
 	}
 }
 
@@ -941,6 +903,9 @@ PLUGIN_API void InitializePlugin()
 	AddCommand("/autosize", AutoSizeCmd);
 	AddSettingsPanel("plugins/AutoSize", DrawAutoSize_MQSettingsPanel);
 	LoadINI();
+
+	loadedEQBC = IsPluginLoaded("MQ2EQBC");
+	loadedDannet = IsPluginLoaded("MQ2DanNet");
 	ChooseInstructionPlugin();
 }
 
@@ -960,49 +925,40 @@ PLUGIN_API void ShutdownPlugin()
 
 PLUGIN_API void OnLoadPlugin(const char* pluginName)
 {
+	DebugSpewAlways("OnLoadPluign: MQ2AutoSize -> %s", pluginName);
+
 	// dannet plugin is loading
 	if (ci_equals(pluginName, "MQ2DanNet"))
 	{
-		HandlePluginChange("load", "dannet");
+		loadedDannet = true;
+		ChooseInstructionPlugin();
 	}
 
 	// eqbc plugin is loading
 	if (ci_equals(pluginName, "MQ2EQBC"))
 	{
-		HandlePluginChange("load", "eqbc");
+		loadedEQBC = true;
+		ChooseInstructionPlugin();
 	}
 }
 
 PLUGIN_API void OnUnloadPlugin(const char* pluginName)
 {
+	DebugSpewAlways("OnUnloadPlugin: MQ2AutoSize -> %s", pluginName);
+
 	// dannet plugin is about to unload
 	if (ci_equals(pluginName, "MQ2DanNet"))
 	{
-		HandlePluginChange("unload", "dannet");
+		loadedDannet = false;
+		ChooseInstructionPlugin();
 	}
 
 	// eqbc plugin is about to unload
 	if (ci_equals(pluginName, "MQ2EQBC"))
 	{
-		HandlePluginChange("unload", "eqbc");
+		loadedEQBC = false;
+		ChooseInstructionPlugin();
 	}
-}
-
-void HandlePluginChange(std::string_view action, std::string_view pluginRef)
-{
-	if (ci_equals(action, "unload"))
-	{
-		if (ci_equals(pluginRef, "dannet"))
-		{
-			loaded_dannet = false;
-		}
-		else if (ci_equals(pluginRef, "eqbc"))
-		{
-			loaded_eqbc = false;
-		}
-	}
-	
-	commsCheck = GetTickCount64() + 300; // 300ms delay
 }
 
 template <typename T>
@@ -1106,7 +1062,6 @@ void DrawAutoSize_MQSettingsPanel()
 				ImGui::TableNextColumn();
 				if (ImGui::Checkbox("##OptPet", &AS_Config.OptPet))
 				{
-					;
 					DoCommandf("/autosize pets %s", AS_Config.OptPet ? "on" : "off");
 				}
 				ImGui::TableNextColumn();
@@ -1212,6 +1167,7 @@ void DrawAutoSize_MQSettingsPanel()
 				{
 					ImGui::SameLine();
 				}
+
 				// this button will enable the options which are disabled
 				if (ImGui::Button("Resize Everything (select all)"))
 				{
@@ -1221,27 +1177,27 @@ void DrawAutoSize_MQSettingsPanel()
 
 			ImGui::SeparatorText("Synchronize clients");
 			ImGui::TextWrapped("This section provides the ability to broadcast your settings to connected peers based on which communication path exists.");
-			ImGui::BeginDisabled(loaded_dannet || loaded_eqbc);
+			ImGui::BeginDisabled(loadedDannet || loadedEQBC);
 			RadioButton("None", &selectedComms, eCommunicationMode::None);
-			if (loaded_dannet || loaded_eqbc)
+			if (loadedDannet || loadedEQBC)
 			{
 				ImGui::SameLine();
 				ImGui::Text("(disabled since plugin(s) are available)");
 			}
 			ImGui::EndDisabled();
 
-			ImGui::BeginDisabled(!loaded_dannet);
+			ImGui::BeginDisabled(!loadedDannet);
 			RadioButton("MQ2DanNet", &selectedComms, eCommunicationMode::DanNet);
-			if (!loaded_dannet)
+			if (!loadedDannet)
 			{
 				ImGui::SameLine();
 				ImGui::Text("(disabled as plugin is not loaded)");
 			}
 			ImGui::EndDisabled();
 
-			ImGui::BeginDisabled(!loaded_eqbc);
+			ImGui::BeginDisabled(!loadedEQBC);
 			RadioButton("MQ2EQBC", &selectedComms, eCommunicationMode::EQBC);
-			if (!loaded_eqbc)
+			if (!loadedEQBC)
 			{
 				ImGui::SameLine();
 				ImGui::Text("(disabled as plugin is not loaded)");
@@ -1249,7 +1205,7 @@ void DrawAutoSize_MQSettingsPanel()
 			ImGui::EndDisabled();
 
 			// dannet
-			if (selectedComms == eCommunicationMode::DanNet && loaded_dannet)
+			if (selectedComms == eCommunicationMode::DanNet && loadedDannet)
 			{
 				if (ImGui::Button("All"))
 				{
@@ -1275,7 +1231,7 @@ void DrawAutoSize_MQSettingsPanel()
 				}
 				ImGui::EndDisabled();
 			}
-			else if (selectedComms == eCommunicationMode::EQBC && loaded_eqbc)
+			else if (selectedComms == eCommunicationMode::EQBC && loadedEQBC)
 			{
 				// eqbc
 				if (ImGui::Button("All"))
@@ -1516,22 +1472,19 @@ void SendGroupCommand(std::string_view who)
  // choose the plugin to use for communication
 void ChooseInstructionPlugin()
 {
-	loaded_eqbc = IsPluginLoaded("MQ2EQBC");
-	loaded_dannet = IsPluginLoaded("MQ2DanNet");
-
 	// prefer DanNet unless EQBC is currently selected
-	if (loaded_eqbc && loaded_dannet)
+	if (loadedEQBC && loadedDannet)
 	{
 		if (selectedComms != eCommunicationMode::EQBC)
 		{
 			selectedComms = eCommunicationMode::DanNet;
 		}
 	}
-	else if (loaded_dannet)
+	else if (loadedDannet)
 	{
 		selectedComms = eCommunicationMode::DanNet;
 	}
-	else if (loaded_eqbc)
+	else if (loadedEQBC)
 	{
 		selectedComms = eCommunicationMode::EQBC;
 	}
