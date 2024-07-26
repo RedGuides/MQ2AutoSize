@@ -1,3 +1,12 @@
+7/26/2024
+--
+Added
+- UI and command to toggle the AutoSize functionality (`/autosize [on|off]`)
+- new TLO member: Enabled (`${AutoSize.Enabled}` or `mq.TLO.AutoSize.Enabled()`)
+
+Updated
+- Wording for `/autosize` and `/autosize dist [on|off]` to better explain how to use them
+
 7/11/2024
 --
 Added

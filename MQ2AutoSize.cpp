@@ -5,7 +5,7 @@
 
 // Plugin Setup
 PreSetup("MQ2AutoSize");
-PLUGIN_VERSION(1.1);
+PLUGIN_VERSION(1.2);
 
 // Constants
 constexpr std::chrono::milliseconds UPDATE_INTERVAL{ 200 }; // Controls the update frequency to perform a radius-based resize
@@ -30,7 +30,7 @@ static void SendGroupCommand(std::string_view who); // Function to send a comman
 static int RoundToNearestTen(int value);            // Function to round a value to the nearest ten
 static bool IsInGroup();                            // Function to check if in a group
 static bool IsInRaid();                             // Function to check if in a raid
-
+void SaveINI(const std::string& param, const bool squelch); // Function to save INI values to disk
 
 enum class eCommunicationMode
 {
@@ -55,6 +55,7 @@ eResizeMode ResizeMode = eResizeMode::Default;
 // our configuration
 struct COurSizes
 {
+	bool Enabled = true;
 	bool OptAutoSave = false;
 	bool OptPC = true;
 	bool OptNPC = false;
@@ -80,6 +81,7 @@ class MQ2AutoSizeType : public MQ2Type
 public:
 	enum class AutoSizeMembers
 	{
+		Enabled,
 		Active,
 		AutoSave,
 		ResizePC,
@@ -101,6 +103,7 @@ public:
 
 	MQ2AutoSizeType() : MQ2Type("AutoSize")
 	{
+		ScopedTypeMember(AutoSizeMembers, Enabled);
 		ScopedTypeMember(AutoSizeMembers, Active);
 		ScopedTypeMember(AutoSizeMembers, AutoSave);
 		ScopedTypeMember(AutoSizeMembers, ResizePC);
@@ -129,6 +132,10 @@ public:
 
 		switch (static_cast<AutoSizeMembers>(pMember->ID))
 		{
+		case AutoSizeMembers::Enabled:
+			Dest.Int = AS_Config.Enabled;
+			Dest.Type = datatypes::pBoolType;
+			return true;
 		case AutoSizeMembers::Active:
 			Dest.Int = AS_Config.OptPC || AS_Config.OptNPC || AS_Config.OptPet || AS_Config.OptMerc || AS_Config.OptMount || AS_Config.OptCorpse || AS_Config.OptSelf;
 			Dest.Type = datatypes::pBoolType;
@@ -262,7 +269,6 @@ void LoadINI()
 	AS_Config.OptMount = GetPrivateProfileBool("Config", "ResizeMounts", false, INIFileName);
 	AS_Config.OptCorpse = GetPrivateProfileBool("Config", "ResizeCorpse", false, INIFileName);
 	AS_Config.OptSelf = GetPrivateProfileBool("Config", "ResizeSelf", false, INIFileName);
-
 	AS_Config.ResizeRange = getSaneSize("Config", "Range", AS_Config.ResizeRange);
 	AS_Config.SizePC = getSaneSize("Config", "SizePC", MIN_SIZE);
 	AS_Config.SizeNPC = getSaneSize("Config", "SizeNPC", MIN_SIZE);
@@ -282,7 +288,7 @@ void LoadINI()
 
 // provide an INI key parameter to save only that key, or leave it null to save all keys
 // enable squelch to suppress output to the client
-void SaveINI(const std::string& param = "", const bool squelch = nullptr)
+void SaveINI(const std::string& param = "", const bool squelch = false)
 {
 	// Map to store configuration key-value pairs
 	std::vector<std::pair<std::string, std::string>> configMap =
@@ -350,6 +356,19 @@ void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize)
 	}
 }
 
+
+void HandleResize(PlayerClient* pSpawn, bool bReset, int size, bool option) {
+	if (option) {
+		// only resize if functionality is enabled
+		if (AS_Config.Enabled) {
+			ChangeSize(pSpawn, bReset ? ZERO_SIZE : size);
+		}
+		else {
+			ChangeSize(pSpawn, ZERO_SIZE);
+		}
+	}
+}
+
 void SizePasser(PlayerClient* pSpawn, bool bReset)
 {
 	if (GetGameState() != GAMESTATE_INGAME)
@@ -362,7 +381,10 @@ void SizePasser(PlayerClient* pSpawn, bool bReset)
 	if (pSpawn->SpawnID == pLocalPlayer->SpawnID)
 	{
 		if (AS_Config.OptSelf)
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeSelf);
+		{
+			HandleResize(pSpawn, bReset, AS_Config.SizeSelf, AS_Config.OptSelf);
+		}
+			
 		return;
 	}
 
@@ -371,37 +393,37 @@ void SizePasser(PlayerClient* pSpawn, bool bReset)
 	case PC:
 		if (AS_Config.OptPC)
 		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePC);
+			HandleResize(pSpawn, bReset, AS_Config.SizePC, AS_Config.OptPC);
 		}
 		break;
 	case NPC:
 		if (AS_Config.OptNPC)
 		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeNPC);
+			HandleResize(pSpawn, bReset, AS_Config.SizeNPC, AS_Config.OptNPC);	
 		}
 		break;
 	case PET:
 		if (AS_Config.OptPet)
 		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizePet);
+			HandleResize(pSpawn, bReset, AS_Config.SizePet, AS_Config.OptPet);
 		}
 		break;
 	case MERCENARY:
 		if (AS_Config.OptMerc)
 		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMerc);
+			HandleResize(pSpawn, bReset, AS_Config.SizeMerc, AS_Config.OptMerc);
 		}
 		break;
 	case MOUNT:
 		if (AS_Config.OptMount && pSpawn->SpawnID != pLocalPlayer->SpawnID)
 		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeMount);
+			HandleResize(pSpawn, bReset, AS_Config.SizeMount, AS_Config.OptMount);
 		}
 		break;
 	case CORPSE:
 		if (AS_Config.OptCorpse)
 		{
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : AS_Config.SizeCorpse);
+			HandleResize(pSpawn, bReset, AS_Config.SizeCorpse, AS_Config.OptCorpse);
 		}
 		break;
 	default:
@@ -480,8 +502,8 @@ PLUGIN_API void OnPulse()
 void OutputHelp()
 {
 	WriteChatf("\ay%s\aw:: Command Usage Help", mqplugin::PluginName);
-	WriteChatf("  \ag/autosize\ax - Toggles zone-wide AutoSize on/off");
-	WriteChatf("  \ag/autosize\ax \aydist\ax - Toggles distance-based AutoSize on/off");
+	WriteChatf("  \ag/autosize\ax - Toggles AutoSize functionality on/off");
+	WriteChatf("  \ag/autosize\ax \aydist\ax - Toggles distance-based vs Zonewide");
 	WriteChatf("  \ag/autosize\ax \ayrange #\ax - Sets range for distance checking");
 	WriteChatf("--- Valid Resize Toggles ---");
 	WriteChatf("  \ag/autosize\ax [ \aypc\ax | \aynpc\ax | \aypets\ax | \aymercs\ax | \aymounts\ax | \aycorpse\ax | \ayeverything\ax | \ayself\ax ]");
@@ -499,8 +521,7 @@ void OutputStatus()
 	char szOn[10] = "\agon\ax";
 	char szOff[10] = "\aroff\ax";
 
-	// replaced above with a more direct feedback
-	if (!AS_Config.OptPC && !AS_Config.OptNPC && !AS_Config.OptPet && !AS_Config.OptMerc && !AS_Config.OptCorpse && !AS_Config.OptSelf)
+	if (!AS_Config.Enabled || !AS_Config.OptPC && !AS_Config.OptNPC && !AS_Config.OptPet && !AS_Config.OptMerc && !AS_Config.OptCorpse && !AS_Config.OptSelf)
 	{
 		strcpy_s(szMethod, "\arInactive\ax");
 	}
@@ -599,21 +620,16 @@ void AutoSizeCmd(PlayerClient*, const char* szLine)
 
 	if (!szCurArg[0])
 	{
-		// fake Zonewide with large value which is effectively Far Cliping Plane at 100%
-		if (AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange < FAR_CLIP_PLANE)
-		{
-			// this means we are currently using Range distance normally
-			// now we want look like we are toggling to Zonewide
-			// we will do this by increasing the ResizeRange to FAR_CLIP_PLANE
-			Emulate("zonewide");
-		}
-		else if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
-		{
-			// this means we are pretending to be Zonewide and need to revert to Range based
-			// now we want look like we are toggling to Zonewide
-			// we will do this by reseting the ResizeRange to what it was prior to going zonewide
-			Emulate("range");
-		}
+		// toggle AutoSize functionality via configuration
+		ToggleOption("AutoSize functionality", &AS_Config.Enabled);
+	}
+	else if (ci_equals(szCurArg, "on"))
+	{
+		SetOption("AutoSize functionality", &AS_Config.Enabled, true);
+	}
+	else if (ci_equals(szCurArg, "off"))
+	{
+		SetOption("AutoSize functionality", &AS_Config.Enabled, false);
 	}
 	else if (ci_equals(szCurArg, "dist"))
 	{
@@ -621,6 +637,9 @@ void AutoSizeCmd(PlayerClient*, const char* szLine)
 		{
 			if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 			{
+				// this means we are currently set to Zonewide and need to set to Range instead
+				// we want look like we are toggling to Range from Zonewide setting
+				// we will do this by reseting the ResizeRange to what it was prior
 				Emulate("range");
 			}
 		}
@@ -628,6 +647,9 @@ void AutoSizeCmd(PlayerClient*, const char* szLine)
 		{
 			if (AS_Config.ResizeRange != FAR_CLIP_PLANE)
 			{
+				// this means we are currently set to Range distance and want to be Zonewide
+				// we want look like we are toggling to Zonewide from Range setting
+				// we will do this by increasing the ResizeRange to FAR_CLIP_PLANE
 				Emulate("zonewide");
 			}
 		}
@@ -881,14 +903,6 @@ void AutoSizeCmd(PlayerClient*, const char* szLine)
 	{
 		OutputStatus();
 	}
-	else if (ci_equals(szCurArg, "on"))
-	{
-		Emulate("zonewide");
-	}
-	else if (ci_equals(szCurArg, "off"))
-	{
-		Emulate("range");
-	}
 	else
 	{
 		WriteChatf("\ay%s\aw:: \arInvalid command parameter.", mqplugin::PluginName);
@@ -976,6 +990,9 @@ void DrawAutoSize_MQSettingsPanel()
 		if (ImGui::BeginTabItem("Options"))
 		{
 			ImGui::SeparatorText("General");
+			// General: Enable / Disable AutoSize functionality
+			ImGui::Checkbox("Enable AutoSize functionality", &AS_Config.Enabled);
+			
 			// General: auto save
 			if (ImGui::Checkbox("Enable auto saving of configuration", &AS_Config.OptAutoSave))
 			{
@@ -1262,34 +1279,34 @@ void DrawAutoSize_MQSettingsPanel()
 				ImGui::TableNextColumn(); ImGui::Text("Automatically save settings to INI file when an option is toggled or size is set");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles zone-wide AutoSize on/off");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize functionality (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize dist");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles distance-based AutoSize on/off");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles distance-based vs Zonewide (range 1000)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize pc");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize PC spawn types");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize PC spawn types (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize npc");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize NPC spawn types");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize NPC spawn types (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize pets");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize pet spawn types");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize pet spawn types (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize mercs");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize mercenary spawn types");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize mercenary spawn types (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize mounts");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize mounted player spawn types");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize mounted player spawn types (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize corpse");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize corpse spawn types");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize corpse spawn types (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize self");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize for your character");
+				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize for your character (on/off)");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize everything");
-				ImGui::TableNextColumn(); ImGui::Text("Toggles AutoSize all spawn types");
+				ImGui::TableNextColumn(); ImGui::Text("Enables AutoSize for all spawn types");
 				ImGui::EndTable();
 				ImGui::Unindent();
 			}
@@ -1379,12 +1396,12 @@ void SendGroupCommand(std::string_view who)
 		// check if zonewide is enabled and send instruction
 		if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 		{
-			instruction += "/multiline ; /autosize load; /autosize on";
+			instruction += "/multiline ; /autosize load; /autosize dist off";
 		}
 		else
 		{
-			// just send instruction to load configuration
-			instruction = "/autosize load";
+			// send instruction to load configuration and set Enabled functionality
+			instruction += fmt::format("/multiline ; /autosize load; /timed 5 /autosize {}", AS_Config.Enabled ? "on" : "off");
 		}
 	}
 	else
@@ -1402,13 +1419,16 @@ void SendGroupCommand(std::string_view who)
 		if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 		{
 			// this covers the use case of the instructor having "zonewide" enabled
-			instruction += "/autosize on; ";
+			instruction += "/autosize dist off; ";
 		}
 		else if (AS_Config.ResizeRange != FAR_CLIP_PLANE)
 		{
 			// this covers the use case of the instructor having "range" enabled
-			instruction += fmt::format("/autosize off; /autosize range {}; ", AS_Config.ResizeRange);
+			instruction += fmt::format("/autosize dist on; /autosize range {}; ", AS_Config.ResizeRange);
 		}
+
+		// Enabled value
+		instruction += fmt::format("/autosize {}; ", AS_Config.Enabled ? "on" : "off");
 
 		// OptPC + SizePC
 		instruction += fmt::format("/autosize pc {}; /autosize sizepc {}; ", AS_Config.OptPC ? "on" : "off", AS_Config.SizePC);

@@ -9,19 +9,19 @@ NOTE: These effects are client side only.
 ## Toggles (you may also append on or off to set the value):
 
 * /autosize autosave   - Automatically save settings to INI file when an option is toggled or size is set
-* /autosize            - Toggles AutoSize on/off with a range of 1000
-* /autosize dist       - Toggles distance-based AutoSize on/off
-* /autosize pc         - Toggles AutoSize PC spawn types
-* /autosize npc        - Toggles AutoSize NPC spawn types
-* /autosize pets       - Toggles AutoSize pet spawn types
-* /autosize mercs      - Toggles AutoSize mercenary spawn types
-* /autosize mounts     - Toggles AutoSize mounted player spawn types
-* /autosize corpse     - Toggles AutoSize corpse spawn types
-* /autosize everything - Toggles AutoSize all spawn types
-* /autosize self       - Toggles AutoSize for your character
-* /autosize range #    - Sets range for distance-based AutoSize
+* /autosize            - Toggles AutoSize functionality (on/off)
+* /autosize dist       - Toggles distance-based vs Zonewide (range 1000)
+* /autosize pc         - Toggles AutoSize PC spawn types (on/off)
+* /autosize npc        - Toggles AutoSize NPC spawn types (on/off)
+* /autosize pets       - Toggles AutoSize pet spawn types (on/off)
+* /autosize mercs      - Toggles AutoSize mercenary spawn types (on/off)
+* /autosize mounts     - Toggles AutoSize mounted player spawn types (on/off)
+* /autosize corpse     - Toggles AutoSize corpse spawn types (on/off)
+* /autosize everything - Toggles AutoSize all spawn types (on/off)
+* /autosize self       - Toggles AutoSize for your character (on/off)
 
 ## Size configuration (valid sizes 1 to 250)
+* /autosize range #      - Sets range for distance-based AutoSize
 * /autosize sizeself #   - Sets size for your character
 * /autosize sizepc #     - Sets size for PC spawn types
 * /autosize sizenpc #    - Sets size for NPC spawn types
