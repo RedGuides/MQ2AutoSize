@@ -357,15 +357,13 @@ void ChangeSize(PlayerClient* pChangeSpawn, float fNewSize)
 }
 
 
-void HandleResize(PlayerClient* pSpawn, bool bReset, int size, bool option) {
-	if (option) {
-		// only resize if functionality is enabled
-		if (AS_Config.Enabled) {
-			ChangeSize(pSpawn, bReset ? ZERO_SIZE : size);
-		}
-		else {
-			ChangeSize(pSpawn, ZERO_SIZE);
-		}
+void HandleResize(PlayerClient* pSpawn, bool bReset, int size) {
+	// only resize if functionality is enabled
+	if (AS_Config.Enabled) {
+		ChangeSize(pSpawn, bReset ? ZERO_SIZE : size);
+	}
+	else {
+		ChangeSize(pSpawn, ZERO_SIZE);
 	}
 }
 
@@ -382,7 +380,7 @@ void SizePasser(PlayerClient* pSpawn, bool bReset)
 	{
 		if (AS_Config.OptSelf)
 		{
-			HandleResize(pSpawn, bReset, AS_Config.SizeSelf, AS_Config.OptSelf);
+			HandleResize(pSpawn, bReset, AS_Config.SizeSelf);
 		}
 			
 		return;
@@ -393,37 +391,37 @@ void SizePasser(PlayerClient* pSpawn, bool bReset)
 	case PC:
 		if (AS_Config.OptPC)
 		{
-			HandleResize(pSpawn, bReset, AS_Config.SizePC, AS_Config.OptPC);
+			HandleResize(pSpawn, bReset, AS_Config.SizePC);
 		}
 		break;
 	case NPC:
 		if (AS_Config.OptNPC)
 		{
-			HandleResize(pSpawn, bReset, AS_Config.SizeNPC, AS_Config.OptNPC);	
+			HandleResize(pSpawn, bReset, AS_Config.SizeNPC);	
 		}
 		break;
 	case PET:
 		if (AS_Config.OptPet)
 		{
-			HandleResize(pSpawn, bReset, AS_Config.SizePet, AS_Config.OptPet);
+			HandleResize(pSpawn, bReset, AS_Config.SizePet);
 		}
 		break;
 	case MERCENARY:
 		if (AS_Config.OptMerc)
 		{
-			HandleResize(pSpawn, bReset, AS_Config.SizeMerc, AS_Config.OptMerc);
+			HandleResize(pSpawn, bReset, AS_Config.SizeMerc);
 		}
 		break;
 	case MOUNT:
 		if (AS_Config.OptMount && pSpawn->SpawnID != pLocalPlayer->SpawnID)
 		{
-			HandleResize(pSpawn, bReset, AS_Config.SizeMount, AS_Config.OptMount);
+			HandleResize(pSpawn, bReset, AS_Config.SizeMount);
 		}
 		break;
 	case CORPSE:
 		if (AS_Config.OptCorpse)
 		{
-			HandleResize(pSpawn, bReset, AS_Config.SizeCorpse, AS_Config.OptCorpse);
+			HandleResize(pSpawn, bReset, AS_Config.SizeCorpse);
 		}
 		break;
 	default:
