@@ -621,6 +621,10 @@ void AutoSizeCmd(PlayerClient*, const char* szLine)
 		// toggle AutoSize functionality via configuration
 		ToggleOption("AutoSize functionality", &AS_Config.Enabled);
 	}
+	else if (ci_equals(szCurArg, "gui") || ci_equals(szCurArg, "show") || ci_equals(szCurArg, "ui"))
+	{
+		DoCommand("/mqsettings plugins/autosize");
+	}
 	else if (ci_equals(szCurArg, "on"))
 	{
 		SetOption("AutoSize functionality", &AS_Config.Enabled, true);
