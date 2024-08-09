@@ -5,7 +5,7 @@
 
 // Plugin Setup
 PreSetup("MQ2AutoSize");
-PLUGIN_VERSION(1.2);
+PLUGIN_VERSION(1.3);
 
 // Constants
 constexpr std::chrono::milliseconds UPDATE_INTERVAL{ 200 }; // Controls the update frequency to perform a radius-based resize
@@ -508,7 +508,7 @@ void OutputHelp()
 	WriteChatf("--- Valid Size Syntax (%d to %d) ---", MIN_SIZE, MAX_SIZE);
 	WriteChatf("  \ag/autosize\ax [ \aysizepc\ax | \aysizenpc\ax | \aysizepets\ax | \aysizemercs\ax | \aysizemounts\ax | \aysizecorpse\ax | \aysizeself\ax ] [ \ay#\ax ]");
 	WriteChatf("--- Other Valid Commands ---");
-	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
+	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aygui\ax | \ayui\ax | \ayshow\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
 	WriteChatf("--- Ability to set options ---");
 	WriteChatf("  \ag/autosize\ax [ \ayautosize\ax | \aypc\ax | \aynpc\ax | \aypets\ax | \aymercs\ax | \aymounts\ax | \aycorpse\ax | \ayeverything\ax | \ayself\ax ] [\agon\ax | \aroff\ax]");
 }
@@ -1352,6 +1352,9 @@ void DrawAutoSize_MQSettingsPanel()
 			{
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 150.0f);
 				ImGui::TableSetupColumn("");
+				ImGui::TableNextColumn(); ImGui::Text("/autosize [gui | ui | show]");
+				ImGui::TableNextColumn(); ImGui::Text("Display the ImGui panel under /mqsettings");
+				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize status");
 				ImGui::TableNextColumn(); ImGui::Text("Display current plugin settings to chatwnd");
 				ImGui::TableNextRow();

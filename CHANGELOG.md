@@ -1,3 +1,8 @@
+8/09/2024
+--
+Added
+- command to open UI: /autosize [gui | ui | show]
+
 7/26/2024
 --
 Added

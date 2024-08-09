@@ -32,6 +32,7 @@ NOTE: These effects are client side only.
 
 ## Other Commands:
 * /autosize status - Display current plugin settings to MQ Console and or chatwnd if loaded
+* /autosize [gui | ui | show] - Display the ImGui panel under /mqsettings
 * /autosize help   - Display command syntax to MQ Console and or chatwnd if loaded
 * /autosize save   - Save settings to INI file (auto on plugin unload)
 * /autosize load   - Load settings from INI file (auto on plugin load)
