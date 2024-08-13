@@ -1,7 +1,10 @@
-8/09/2024
+8/12/2024
 --
 Added
-- command to open UI: /autosize [gui | ui | show]
+- command to open UI: /autosize [gui|ui]
+
+Fixed
+- Zonewide value (range = 1000) will now be saved to INI like all other values
 
 7/26/2024
 --
