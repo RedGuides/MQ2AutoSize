@@ -1355,7 +1355,7 @@ void DrawAutoSize_MQSettingsPanel()
 			{
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 150.0f);
 				ImGui::TableSetupColumn("");
-				ImGui::TableNextColumn(); ImGui::Text("/autosize [gui | ui | show]");
+				ImGui::TableNextColumn(); ImGui::Text("/autosize [gui | ui]");
 				ImGui::TableNextColumn(); ImGui::Text("Display the ImGui panel under /mqsettings");
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize status");
