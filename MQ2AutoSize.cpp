@@ -5,7 +5,7 @@
 
 // Plugin Setup
 PreSetup("MQ2AutoSize");
-PLUGIN_VERSION(1.2);
+PLUGIN_VERSION(1.3);
 
 // Constants
 constexpr std::chrono::milliseconds UPDATE_INTERVAL{ 200 }; // Controls the update frequency to perform a radius-based resize
@@ -256,6 +256,13 @@ public:
 static int getSaneSize(const char* section, const char* key, int defaultValue)
 {
 	int size = GetPrivateProfileInt(section, key, defaultValue, INIFileName);
+
+	// special handling for Zonewide
+	if (size == FAR_CLIP_PLANE)
+	{
+		return size;
+	}
+
 	return std::clamp(size, MIN_SIZE, MAX_SIZE);
 }
 
@@ -279,6 +286,16 @@ void LoadINI()
 	AS_Config.SizeSelf = getSaneSize("Config", "SizeSelf", MIN_SIZE);
 	WriteChatf("\ay%s\aw:: Configuration file loaded.", mqplugin::PluginName);
 
+	// special handling for Zonewide vs Range
+	if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
+	{
+		ResizeMode = eResizeMode::Zonewide;
+	}
+	else
+	{
+		ResizeMode = eResizeMode::Range;
+	}
+
 	// apply new settings from INI read
 	if (GetGameState() == GAMESTATE_INGAME && pLocalPlayer)
 	{
@@ -301,6 +318,7 @@ void SaveINI(const std::string& param = "", const bool squelch = false)
 		{"ResizeMounts", AS_Config.OptMount ? "on" : "off"},
 		{"ResizeCorpse", AS_Config.OptCorpse ? "on" : "off"},
 		{"ResizeSelf", AS_Config.OptSelf ? "on" : "off"},
+		{"Range", std::to_string(AS_Config.ResizeRange)},
 		{"SizePC", std::to_string(AS_Config.SizePC)},
 		{"SizeNPC", std::to_string(AS_Config.SizeNPC)},
 		{"SizePets", std::to_string(AS_Config.SizePet)},
@@ -318,13 +336,6 @@ void SaveINI(const std::string& param = "", const bool squelch = false)
 		{
 			WritePrivateProfileString("Config", it->first, it->second, INIFileName);
 		}
-
-		// special handling for Range key, we don't want to write the value to disk unless
-		// it's between MIN_SIZE and MAX_SIZE
-		else if (param == "Range" && AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange <= MAX_SIZE)
-		{
-			WritePrivateProfileInt("Config", "Range", AS_Config.ResizeRange, INIFileName);
-		}
 	}
 	else
 	{
@@ -332,12 +343,6 @@ void SaveINI(const std::string& param = "", const bool squelch = false)
 		for (const auto& [key, value] : configMap)
 		{
 			WritePrivateProfileString("Config", key, value, INIFileName);
-		}
-
-		// special handling for Range since it's not part of the map (intentionally)
-		if (AS_Config.ResizeRange >= MIN_SIZE && AS_Config.ResizeRange <= MAX_SIZE)
-		{
-			WritePrivateProfileInt("Config", "Range", AS_Config.ResizeRange, INIFileName);
 		}
 	}
 
@@ -508,7 +513,7 @@ void OutputHelp()
 	WriteChatf("--- Valid Size Syntax (%d to %d) ---", MIN_SIZE, MAX_SIZE);
 	WriteChatf("  \ag/autosize\ax [ \aysizepc\ax | \aysizenpc\ax | \aysizepets\ax | \aysizemercs\ax | \aysizemounts\ax | \aysizecorpse\ax | \aysizeself\ax ] [ \ay#\ax ]");
 	WriteChatf("--- Other Valid Commands ---");
-	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
+	WriteChatf("  \ag/autosize\ax [ \ayhelp\ax | \aygui\ax | \ayui\ax | \ayshow\ax | \aystatus\ax | \ayautosave\ax | \aysave\ax | \ayload\ax ]");
 	WriteChatf("--- Ability to set options ---");
 	WriteChatf("  \ag/autosize\ax [ \ayautosize\ax | \aypc\ax | \aynpc\ax | \aypets\ax | \aymercs\ax | \aymounts\ax | \aycorpse\ax | \ayeverything\ax | \ayself\ax ] [\agon\ax | \aroff\ax]");
 }
@@ -581,23 +586,21 @@ void SetOption(const char* optString, bool* pbOption, bool bValue)
 
 void SetSizeConfig(const char* pszOption, int iNewSize, int* iOldSize)
 {
-	// special handling for Range being set to Zonewide
-	if (ci_equals(pszOption, "range") && iNewSize == FAR_CLIP_PLANE)
-	{
-		// set the pointer to the new value
-		*iOldSize = iNewSize;
-		WriteChatf("\ay%s\aw:: Range size is \agZonewide\ax - %d units", mqplugin::PluginName, FAR_CLIP_PLANE);
-		// return early to avoid saving to INI
-		return;
-	}
-
 	// make sure that we are setting values for a valid reason
-	if ((iNewSize != *iOldSize) && (iNewSize >= MIN_SIZE && iNewSize <= MAX_SIZE))
+	if ((iNewSize != *iOldSize) && ((iNewSize >= MIN_SIZE && iNewSize <= MAX_SIZE) || (iNewSize == FAR_CLIP_PLANE)))
 	{
 		int iPrevSize = *iOldSize;
 		// set the pointer to the new value
 		*iOldSize = iNewSize;
-		WriteChatf("\ay%s\aw:: %s size changed from \ay%d\ax to \ag%d", mqplugin::PluginName, pszOption, iPrevSize, *iOldSize);
+
+		if (ci_equals(pszOption, "range"))
+		{
+			WriteChatf("\ay%s\aw:: Range size is \agZonewide\ax (%d units)", mqplugin::PluginName, FAR_CLIP_PLANE);
+		}
+		else {
+			WriteChatf("\ay%s\aw:: %s size changed from \ay%d\ax to \ag%d", mqplugin::PluginName, pszOption, iPrevSize, *iOldSize);
+		}
+		
 	}
 	else
 	{
@@ -620,6 +623,10 @@ void AutoSizeCmd(PlayerClient*, const char* szLine)
 	{
 		// toggle AutoSize functionality via configuration
 		ToggleOption("AutoSize functionality", &AS_Config.Enabled);
+	}
+	else if (ci_equals(szCurArg, "gui") || ci_equals(szCurArg, "ui"))
+	{
+		DoCommand("/mqsettings plugins/autosize");
 	}
 	else if (ci_equals(szCurArg, "on"))
 	{
@@ -1348,6 +1355,9 @@ void DrawAutoSize_MQSettingsPanel()
 			{
 				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 150.0f);
 				ImGui::TableSetupColumn("");
+				ImGui::TableNextColumn(); ImGui::Text("/autosize [gui | ui]");
+				ImGui::TableNextColumn(); ImGui::Text("Display the ImGui panel under /mqsettings");
+				ImGui::TableNextRow();
 				ImGui::TableNextColumn(); ImGui::Text("/autosize status");
 				ImGui::TableNextColumn(); ImGui::Text("Display current plugin settings to chatwnd");
 				ImGui::TableNextRow();
@@ -1542,12 +1552,25 @@ void Emulate(std::string_view type)
 	{
 		if (AS_Config.ResizeRange == FAR_CLIP_PLANE)
 		{
-			AS_Config.ResizeRange = previousRangeDistance;
+			// special handling if Zonewide was pre-selected on plugin load
+			if (previousRangeDistance == 0)
+			{
+				AS_Config.ResizeRange = MAX_SIZE;
+			}
+			else {
+				AS_Config.ResizeRange = previousRangeDistance;
+			}
+			
 			ResizeMode = eResizeMode::Range;
 			WriteChatf("\ay%s\aw:: AutoSize (\ayZonewide\ax) now \ardisabled\ax!", mqplugin::PluginName);
 			WriteChatf("\ay%s\aw:: AutoSize (\ayRange\ax) now \agenabled\ax!", mqplugin::PluginName);
 			SpawnListResize(false);
 		}
+	}
+
+	if (AS_Config.OptAutoSave)
+	{
+		SaveINI("Range", true);
 	}
 }
 
