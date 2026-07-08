@@ -488,7 +488,7 @@ PLUGIN_API void OnPulse()
 	PlayerClient* pAllSpawns = pSpawnList;
 	while (pAllSpawns)
 	{
-		float fDist = GetDistance(pLocalPlayer, pAllSpawns);
+		float fDist = GetDistance2D(pLocalPlayer, pAllSpawns);
 		if (fDist < AS_Config.ResizeRange)
 		{
 			SizePasser(pAllSpawns, false);
